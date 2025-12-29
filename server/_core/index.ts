@@ -30,11 +30,22 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  
+  // Webhook routes need raw body for signature verification
+  // Must be registered BEFORE json body parser
+  app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+  app.use('/api/webhooks/crypto', express.raw({ type: 'application/json' }));
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  
+  // Register webhook routes
+  const { registerWebhookRoutes } = await import('../webhooks');
+  registerWebhookRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",
