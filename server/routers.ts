@@ -109,6 +109,7 @@ export const appRouter = router({
         if (database) {
           await database.update(orders).set({
             stripePaymentIntentId: paymentIntent.id,
+            updatedAt: new Date(),
           }).where(eq(orders.id, order.id));
         }
 

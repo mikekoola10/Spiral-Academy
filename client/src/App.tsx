@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Courses from "./pages/Courses";
 import Checkout from "./pages/Checkout";
 import MyCourses from "./pages/MyCourses";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import Admin from "./pages/Admin";
 
 function Router() {
@@ -14,6 +15,7 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Courses} />
       <Route path={"/checkout/:id"} component={Checkout} />
+      <Route path={"/payment-success"} component={PaymentSuccess} />
       <Route path={"/my-courses"} component={MyCourses} />
       <Route path={"/admin"} component={Admin} />
       <Route path={"/404"} component={NotFound} />

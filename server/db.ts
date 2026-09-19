@@ -1,5 +1,6 @@
 import { eq, desc, and } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -8,7 +9,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const sql = neon(process.env.DATABASE_URL);
+      _db = drizzle(sql);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -32,7 +34,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = {
       openId: user.openId,
     };
-    const updateSet: Record<string, unknown> = {};
+    const updateSet: Partial<InsertUser> = {};
 
     const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
@@ -67,7 +69,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    // Postgres has no ON UPDATE NOW(); emulate it explicitly.
+    updateSet.updatedAt = new Date();
+
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -93,14 +99,14 @@ export async function getUserByOpenId(openId: string) {
 export async function getAllCourses(): Promise<Course[]> {
   const db = await getDb();
   if (!db) return [];
-  
+
   return await db.select().from(courses).where(eq(courses.isActive, true)).orderBy(desc(courses.createdAt));
 }
 
 export async function getCourseById(courseId: number): Promise<Course | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  
+
   const result = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
@@ -108,13 +114,10 @@ export async function getCourseById(courseId: number): Promise<Course | undefine
 export async function createCourse(course: InsertCourse): Promise<Course> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  const result = await db.insert(courses).values(course);
-  const insertedId = Number(result[0].insertId);
-  
-  const newCourse = await getCourseById(insertedId);
+
+  const [newCourse] = await db.insert(courses).values(course).returning();
   if (!newCourse) throw new Error("Failed to retrieve created course");
-  
+
   return newCourse;
 }
 
@@ -123,20 +126,17 @@ export async function createCourse(course: InsertCourse): Promise<Course> {
 export async function createOrder(order: InsertOrder): Promise<Order> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  const result = await db.insert(orders).values(order);
-  const insertedId = Number(result[0].insertId);
-  
-  const newOrder = await getOrderById(insertedId);
+
+  const [newOrder] = await db.insert(orders).values(order).returning();
   if (!newOrder) throw new Error("Failed to retrieve created order");
-  
+
   return newOrder;
 }
 
 export async function getOrderById(orderId: number): Promise<Order | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  
+
   const result = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
@@ -144,7 +144,7 @@ export async function getOrderById(orderId: number): Promise<Order | undefined> 
 export async function getOrderByStripePaymentIntentId(paymentIntentId: string): Promise<Order | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  
+
   const result = await db.select().from(orders).where(eq(orders.stripePaymentIntentId, paymentIntentId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
@@ -152,7 +152,7 @@ export async function getOrderByStripePaymentIntentId(paymentIntentId: string): 
 export async function getOrderByCryptoPaymentId(cryptoPaymentId: string): Promise<Order | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  
+
   const result = await db.select().from(orders).where(eq(orders.cryptoPaymentId, cryptoPaymentId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
@@ -160,8 +160,8 @@ export async function getOrderByCryptoPaymentId(cryptoPaymentId: string): Promis
 export async function updateOrderStatus(orderId: number, status: "pending" | "completed" | "failed" | "refunded", completedAt?: Date): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  await db.update(orders).set({ 
+
+  await db.update(orders).set({
     paymentStatus: status,
     completedAt: completedAt || (status === "completed" ? new Date() : undefined),
     updatedAt: new Date()
@@ -171,14 +171,14 @@ export async function updateOrderStatus(orderId: number, status: "pending" | "co
 export async function getAllOrders(): Promise<Order[]> {
   const db = await getDb();
   if (!db) return [];
-  
+
   return await db.select().from(orders).orderBy(desc(orders.createdAt));
 }
 
 export async function getUserOrders(userId: number): Promise<Order[]> {
   const db = await getDb();
   if (!db) return [];
-  
+
   return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
 }
 
@@ -187,20 +187,17 @@ export async function getUserOrders(userId: number): Promise<Order[]> {
 export async function createEnrollment(enrollment: InsertEnrollment): Promise<Enrollment> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  const result = await db.insert(enrollments).values(enrollment);
-  const insertedId = Number(result[0].insertId);
-  
-  const newEnrollment = await getEnrollmentById(insertedId);
+
+  const [newEnrollment] = await db.insert(enrollments).values(enrollment).returning();
   if (!newEnrollment) throw new Error("Failed to retrieve created enrollment");
-  
+
   return newEnrollment;
 }
 
 export async function getEnrollmentById(enrollmentId: number): Promise<Enrollment | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  
+
   const result = await db.select().from(enrollments).where(eq(enrollments.id, enrollmentId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
@@ -208,7 +205,7 @@ export async function getEnrollmentById(enrollmentId: number): Promise<Enrollmen
 export async function getUserEnrollments(userId: number): Promise<Enrollment[]> {
   const db = await getDb();
   if (!db) return [];
-  
+
   return await db.select().from(enrollments).where(
     and(eq(enrollments.userId, userId), eq(enrollments.isActive, true))
   ).orderBy(desc(enrollments.enrolledAt));
@@ -217,22 +214,22 @@ export async function getUserEnrollments(userId: number): Promise<Enrollment[]> 
 export async function checkEnrollment(userId: number, courseId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
-  
+
   const result = await db.select().from(enrollments).where(
     and(
       eq(enrollments.userId, userId),
-      eq(enrollments.courseId, courseId),
-      eq(enrollments.isActive, true)
+      eq(enrollments.isActive, true),
+      eq(enrollments.courseId, courseId)
     )
   ).limit(1);
-  
+
   return result.length > 0;
 }
 
 export async function getAllEnrollments(): Promise<Enrollment[]> {
   const db = await getDb();
   if (!db) return [];
-  
+
   return await db.select().from(enrollments).orderBy(desc(enrollments.enrolledAt));
 }
 
@@ -241,13 +238,13 @@ export async function getAllEnrollments(): Promise<Enrollment[]> {
 export async function createPaymentLog(log: InsertPaymentLog): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   await db.insert(paymentLogs).values(log);
 }
 
 export async function getPaymentLogsByOrderId(orderId: number) {
   const db = await getDb();
   if (!db) return [];
-  
+
   return await db.select().from(paymentLogs).where(eq(paymentLogs.orderId, orderId)).orderBy(desc(paymentLogs.createdAt));
 }
