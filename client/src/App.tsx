@@ -8,12 +8,14 @@ import Courses from "./pages/Courses";
 import Checkout from "./pages/Checkout";
 import MyCourses from "./pages/MyCourses";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Courses} />
+      <Route path={"/login"} component={Login} />
       <Route path={"/checkout/:id"} component={Checkout} />
       <Route path={"/payment-success"} component={PaymentSuccess} />
       <Route path={"/my-courses"} component={MyCourses} />

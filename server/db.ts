@@ -1,16 +1,31 @@
 import { eq, desc, and } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
+import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { neon } from "@neondatabase/serverless";
+import { Pool } from "pg";
 import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+type Db = ReturnType<typeof drizzleNeon> | ReturnType<typeof drizzleNodePg>;
 
-export async function getDb() {
+let _db: Db | null = null;
+
+/** Neon uses its HTTP driver; any other Postgres URL uses node-postgres. */
+function isNeonUrl(url: string): boolean {
+  return url.includes("neon.tech");
+}
+
+export async function getDb(): Promise<Db | null> {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const sql = neon(process.env.DATABASE_URL);
-      _db = drizzle(sql);
+      if (isNeonUrl(process.env.DATABASE_URL)) {
+        const sql = neon(process.env.DATABASE_URL);
+        _db = drizzleNeon(sql);
+      } else {
+        // Standard PostgreSQL (local dev, Railway, Render, self-hosted, ...).
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+        _db = drizzleNodePg(pool);
+      }
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

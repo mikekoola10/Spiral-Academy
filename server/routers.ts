@@ -1,10 +1,24 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import {
+  SESSION_TTL_MS,
+  createLocalUser,
+  createSession,
+  destroySession,
+  getUserByEmail,
+  isRateLimited,
+  normalizeEmail,
+  syncAdminRole,
+  touchLastSignedIn,
+  verifyPassword,
+} from "./_core/localAuth";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
+import { parse as parseCookieHeader } from "cookie";
 import * as db from "./db";
 import { orders } from "../drizzle/schema";
+import type { User } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { createStripePaymentIntent, verifyStripeWebhook, isStripeConfigured } from "./stripe";
 import { TRPCError } from "@trpc/server";
@@ -17,12 +31,94 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+// Public user shape returned to clients. The password hash must never
+// leave the server.
+function toPublicUser(user: User) {
+  return {
+    id: user.id,
+    openId: user.openId,
+    name: user.name,
+    email: user.email,
+    loginMethod: user.loginMethod,
+    role: user.role,
+    createdAt: user.createdAt,
+    lastSignedIn: user.lastSignedIn,
+  };
+}
+
 export const appRouter = router({
   system: systemRouter,
   
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    // Never expose the password hash to clients.
+    me: publicProcedure.query(opts => (opts.ctx.user ? toPublicUser(opts.ctx.user) : null)),
+
+    register: publicProcedure
+      .input(
+        z.object({
+          email: z.string().trim().min(3).max(320).email("Enter a valid email address"),
+          password: z.string().min(8, "Password must be at least 8 characters").max(128),
+          name: z.string().trim().min(1).max(100).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const ip = ctx.req.ip ?? "unknown";
+        if (isRateLimited(`register:${ip}`, 10, 60 * 60 * 1000)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many sign-up attempts. Try again later." });
+        }
+
+        const email = normalizeEmail(input.email);
+        const existing = await getUserByEmail(email);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
+        }
+
+        const user = await createLocalUser({ email, password: input.password, name: input.name ?? null });
+        const token = await createSession(user.id);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...getSessionCookieOptions(ctx.req),
+          maxAge: SESSION_TTL_MS,
+        });
+        return { user: toPublicUser(user) } as const;
+      }),
+
+    login: publicProcedure
+      .input(
+        z.object({
+          email: z.string().trim().min(3).max(320).email("Enter a valid email address"),
+          password: z.string().min(1).max(128),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const email = normalizeEmail(input.email);
+        const ip = ctx.req.ip ?? "unknown";
+        if (isRateLimited(`login:${ip}:${email}`, 10, 10 * 60 * 1000)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many login attempts. Try again later." });
+        }
+
+        const user = await getUserByEmail(email);
+        const hash = user?.passwordHash ?? null;
+        const ok = hash ? await verifyPassword(input.password, hash) : false;
+        // Generic message so attackers can't probe which emails are registered.
+        if (!user || !ok) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+        }
+
+        const synced = await syncAdminRole(user);
+        await touchLastSignedIn(synced.id);
+        const token = await createSession(synced.id);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...getSessionCookieOptions(ctx.req),
+          maxAge: SESSION_TTL_MS,
+        });
+        return { user: toPublicUser(synced) } as const;
+      }),
+
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      const header = ctx.req.headers?.cookie;
+      const token =
+        typeof header === "string" ? parseCookieHeader(header)[COOKIE_NAME] : undefined;
+      await destroySession(typeof token === "string" ? token : null);
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;

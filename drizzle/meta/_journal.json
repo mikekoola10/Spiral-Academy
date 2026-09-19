@@ -8,6 +8,13 @@
       "when": 1789807870333,
       "tag": "0000_smart_dreadnoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789816076097,
+      "tag": "0001_large_flatman",
+      "breakpoints": true
     }
   ]
 }
