@@ -98,7 +98,7 @@ async function handleStripeWebhook(req: Request, res: Response) {
     res.json({ received: true });
   } catch (err) {
     console.error('[Stripe Webhook] Error:', err);
-    return res.status(400).send(`Webhook Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    return res.status(400).send('Webhook Error: unable to process webhook');
   }
 }
 
@@ -116,7 +116,7 @@ async function handleCryptoWebhook(req: Request, res: Response) {
     res.status(200).json({ received: true });
   } catch (err) {
     console.error('[Crypto Webhook] Error:', err);
-    return res.status(400).send(`Webhook Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    return res.status(400).send('Webhook Error: unable to process webhook');
   }
 }
 

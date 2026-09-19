@@ -5,6 +5,18 @@ import type { TrpcContext } from "./context";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  errorFormatter({ shape }) {
+    // Never leak internal error details to clients. Libraries like Drizzle
+    // embed the full SQL statement and query params in their error message,
+    // which must not reach the browser.
+    if (shape.data.code === "INTERNAL_SERVER_ERROR") {
+      return {
+        ...shape,
+        message: "Something went wrong. Please try again later.",
+      };
+    }
+    return shape;
+  },
 });
 
 export const router = t.router;
