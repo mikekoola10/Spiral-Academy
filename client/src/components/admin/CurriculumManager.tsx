@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Plus, Pencil, Trash2, Loader2, ChevronDown, ChevronRight, PlayCircle, Sparkles } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, ChevronDown, ChevronRight, PlayCircle, Sparkles, DatabaseZap } from "lucide-react";
+import { toast } from "sonner";
 
 interface ModuleForm {
   id?: number;
@@ -62,6 +63,20 @@ export default function CurriculumManager() {
   const createLesson = trpc.curriculum.createLesson.useMutation({ onSuccess: () => { setLessonDialog(null); invalidate(); } });
   const updateLesson = trpc.curriculum.updateLesson.useMutation({ onSuccess: () => { setLessonDialog(null); invalidate(); } });
   const deleteLesson = trpc.curriculum.deleteLesson.useMutation({ onSuccess: () => { setDeleteTarget(null); invalidate(); } });
+  const seedAll = trpc.curriculum.seedAll.useMutation({
+    onSuccess: (data) => {
+      const seeded = data.results.filter((r) => !r.skipped);
+      const skipped = data.results.filter((r) => r.skipped);
+      const lessons = seeded.reduce((n, r) => n + r.lessons, 0);
+      toast.success(
+        seeded.length > 0
+          ? `Seeded ${lessons} lessons across ${seeded.length} courses${skipped.length > 0 ? ` (${skipped.length} already had content)` : ""}`
+          : "All courses already have content — nothing to seed"
+      );
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const toggle = (id: number) => {
     setExpanded((prev) => {
@@ -133,6 +148,15 @@ export default function CurriculumManager() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="secondary"
+              onClick={() => seedAll.mutate()}
+              disabled={seedAll.isPending}
+              title="Load the bundled lesson content into all courses (skips courses that already have lessons)"
+            >
+              {seedAll.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
+              Seed Lessons
+            </Button>
             <Button
               onClick={() => setModuleDialog({ title: "", description: "" })}
               disabled={!activeCourseId}

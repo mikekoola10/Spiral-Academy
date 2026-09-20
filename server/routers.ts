@@ -22,6 +22,26 @@ import type { User } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { createStripePaymentIntent, verifyStripeWebhook, isStripeConfigured } from "./stripe";
 import { TRPCError } from "@trpc/server";
+import seed04 from "./seed/04-ai-fundamentals.json";
+import seed05 from "./seed/05-prompt-engineering.json";
+import seed06 from "./seed/06-ai-tools-productivity.json";
+import seed07 from "./seed/07-python-for-ai.json";
+import seed08 from "./seed/08-build-ai-apps.json";
+import seed09 from "./seed/09-ai-agents.json";
+import seed10 from "./seed/10-ml-engineering.json";
+import seed11 from "./seed/11-fine-tuning-llms.json";
+
+interface SeedLesson {
+  title: string;
+  contentMarkdown: string;
+  durationMinutes: number;
+  isFreePreview: boolean;
+}
+
+interface SeedCourse {
+  courseId: number;
+  modules: { title: string; lessons: SeedLesson[] }[];
+}
 
 // Admin-only procedure
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -335,6 +355,48 @@ export const appRouter = router({
         await db.deleteLesson(input.id);
         return { success: true };
       }),
+
+    /**
+     * Seed the bundled lesson content into the database. Idempotent: courses
+     * that already have modules are skipped. The content lives in
+     * server/seed/*.json and is bundled with the server at build time.
+     */
+    seedAll: adminProcedure.mutation(async () => {
+      const seedFiles = [
+        seed04, seed05, seed06, seed07, seed08, seed09, seed10, seed11,
+      ] as SeedCourse[];
+      const results: { courseId: number; modules: number; lessons: number; skipped: boolean }[] = [];
+      for (const seed of seedFiles) {
+        const existing = await db.getCourseCurriculum(seed.courseId);
+        if (existing.length > 0) {
+          results.push({ courseId: seed.courseId, modules: 0, lessons: 0, skipped: true });
+          continue;
+        }
+        let lessonCount = 0;
+        for (let mi = 0; mi < seed.modules.length; mi++) {
+          const mod = seed.modules[mi];
+          const created = await db.createModule({
+            courseId: seed.courseId,
+            title: mod.title,
+            position: mi,
+          });
+          for (let li = 0; li < mod.lessons.length; li++) {
+            const lesson = mod.lessons[li];
+            await db.createLesson({
+              moduleId: created.id,
+              title: lesson.title,
+              content: lesson.contentMarkdown,
+              durationMinutes: lesson.durationMinutes,
+              isFreePreview: lesson.isFreePreview,
+              position: li,
+            });
+            lessonCount++;
+          }
+        }
+        results.push({ courseId: seed.courseId, modules: seed.modules.length, lessons: lessonCount, skipped: false });
+      }
+      return { results };
+    }),
   }),
 
   payments: router({
