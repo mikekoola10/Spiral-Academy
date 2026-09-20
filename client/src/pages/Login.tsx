@@ -60,15 +60,19 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4">
-      <Card className="w-full max-w-md shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden px-4 py-8">
+      <div className="absolute inset-0 -z-10" aria-hidden="true">
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-600/[0.08] via-background to-indigo-600/[0.06]" />
+        <div className="absolute -top-20 left-1/2 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-violet-500/15 blur-3xl" />
+      </div>
+      <Card className="w-full max-w-md shadow-xl border bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">
-            <div className="bg-blue-600 rounded-full p-3">
+            <div className="bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl p-3 shadow-lg shadow-violet-600/25">
               <GraduationCap className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">
+          <CardTitle className="text-2xl font-bold font-display">
             {mode === "login" ? "Welcome back" : "Create your account"}
           </CardTitle>
           <CardDescription>
