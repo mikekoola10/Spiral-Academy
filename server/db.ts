@@ -1,9 +1,9 @@
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql, gte } from "drizzle-orm";
 import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { neon } from "@neondatabase/serverless";
 import { Pool } from "pg";
-import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog, modules, Module, InsertModule, lessons, Lesson, InsertLesson, lessonProgress, InsertLessonProgress, emailSubscribers, promoCodes, InsertPromoCode } from "../drizzle/schema";
+import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog, modules, Module, InsertModule, lessons, Lesson, InsertLesson, lessonProgress, InsertLessonProgress, emailSubscribers, promoCodes, InsertPromoCode, pageViews } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 type Db = ReturnType<typeof drizzleNeon> | ReturnType<typeof drizzleNodePg>;
@@ -500,6 +500,81 @@ export async function setPromoCodeActive(id: number, isActive: boolean): Promise
   if (!db) throw new Error("Database not available");
 
   await db.update(promoCodes).set({ isActive }).where(eq(promoCodes.id, id));
+}
+
+// ==================== Page View Analytics ====================
+
+/** Record one page view. Fire-and-forget from the client; never throws. */
+export async function trackPageView(path: string, referrer?: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  try {
+    await db.insert(pageViews).values({ path, referrer: referrer ?? null });
+  } catch (err) {
+    console.warn("[Analytics] Failed to record page view:", err);
+  }
+}
+
+export interface AnalyticsStats {
+  totalViews: number;
+  viewsToday: number;
+  viewsLast7Days: number;
+  byDay: { day: string; views: number }[];
+  topPages: { path: string; views: number }[];
+}
+
+/** Aggregate stats for the admin dashboard. */
+export async function getAnalyticsStats(): Promise<AnalyticsStats> {
+  const db = await getDb();
+  if (!db) {
+    return { totalViews: 0, viewsToday: 0, viewsLast7Days: 0, byDay: [], topPages: [] };
+  }
+
+  const totalRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(pageViews);
+  const totalViews = totalRows[0]?.count ?? 0;
+
+  const todayRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(pageViews)
+    .where(gte(pageViews.createdAt, sql`current_date`));
+  const viewsToday = todayRows[0]?.count ?? 0;
+
+  const weekRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(pageViews)
+    .where(gte(pageViews.createdAt, sql`current_date - interval '7 days'`));
+  const viewsLast7Days = weekRows[0]?.count ?? 0;
+
+  const byDayRows = await db
+    .select({
+      day: sql<string>`to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD')`,
+      views: sql<number>`count(*)::int`,
+    })
+    .from(pageViews)
+    .where(gte(pageViews.createdAt, sql`current_date - interval '14 days'`))
+    .groupBy(sql`date_trunc('day', "createdAt")`)
+    .orderBy(sql`date_trunc('day', "createdAt")`);
+
+  const topPageRows = await db
+    .select({
+      path: pageViews.path,
+      views: sql<number>`count(*)::int`,
+    })
+    .from(pageViews)
+    .groupBy(pageViews.path)
+    .orderBy(sql`count(*) desc`)
+    .limit(10);
+
+  return {
+    totalViews,
+    viewsToday,
+    viewsLast7Days,
+    byDay: byDayRows,
+    topPages: topPageRows,
+  };
 }
 
 // ==================== Payment Log Helpers ====================

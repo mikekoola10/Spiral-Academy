@@ -130,6 +130,20 @@ export type PromoCode = typeof promoCodes.$inferSelect;
 export type InsertPromoCode = typeof promoCodes.$inferInsert;
 
 /**
+ * Page views - lightweight cookieless visitor analytics.
+ * One row per page load; no personal data is stored.
+ */
+export const pageViews = pgTable("pageViews", {
+  id: serial("id").primaryKey(),
+  path: varchar("path", { length: 512 }).notNull(),
+  referrer: varchar("referrer", { length: 1024 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PageView = typeof pageViews.$inferSelect;
+export type InsertPageView = typeof pageViews.$inferInsert;
+
+/**
  * Enrollments table - manages course access
  */
 export const enrollments = pgTable("enrollments", {

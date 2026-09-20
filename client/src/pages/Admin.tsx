@@ -49,6 +49,10 @@ export default function Admin() {
     enabled: isAuthenticated && user?.role === 'admin',
   });
 
+  const { data: analytics } = trpc.analytics.stats.useQuery(undefined, {
+    enabled: isAuthenticated && user?.role === 'admin',
+  });
+
   const [newPromoCode, setNewPromoCode] = useState("");
   const [newPromoPercent, setNewPromoPercent] = useState("30");
   const createPromo = trpc.promos.create.useMutation({
@@ -262,6 +266,7 @@ export default function Admin() {
               <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
               <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
               <TabsTrigger value="promos">Promo Codes</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
             <TabsContent value="orders" className="space-y-4">
@@ -662,6 +667,95 @@ export default function Admin() {
                         <TableRow>
                           <TableCell colSpan={5} className="text-center text-muted-foreground">
                             No promo codes yet
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Total views</CardDescription>
+                    <CardTitle className="text-3xl">{analytics?.totalViews ?? '—'}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Views today</CardDescription>
+                    <CardTitle className="text-3xl">{analytics?.viewsToday ?? '—'}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Last 7 days</CardDescription>
+                    <CardTitle className="text-3xl">{analytics?.viewsLast7Days ?? '—'}</CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Pages</CardTitle>
+                  <CardDescription>Most visited paths of all time</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Path</TableHead>
+                        <TableHead className="text-right">Views</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {analytics && analytics.topPages.length > 0 ? (
+                        analytics.topPages.map((p) => (
+                          <TableRow key={p.path}>
+                            <TableCell className="font-mono font-medium">{p.path}</TableCell>
+                            <TableCell className="text-right">{p.views}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={2} className="text-center text-muted-foreground">
+                            No page views recorded yet.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Views by Day</CardTitle>
+                  <CardDescription>Last 14 days</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Views</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {analytics && analytics.byDay.length > 0 ? (
+                        analytics.byDay.map((d) => (
+                          <TableRow key={d.day}>
+                            <TableCell className="font-medium">{d.day}</TableCell>
+                            <TableCell className="text-right">{d.views}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={2} className="text-center text-muted-foreground">
+                            No page views recorded yet.
                           </TableCell>
                         </TableRow>
                       )}

@@ -634,6 +634,26 @@ export const appRouter = router({
       }),
   }),
 
+  /** Cookieless page-view analytics: public tracking + admin stats. */
+  analytics: router({
+    track: publicProcedure
+      .input(z.object({
+        path: z.string().trim().min(1).max(512),
+        referrer: z.string().trim().max(1024).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const ip = ctx.req.ip ?? "unknown";
+        // Generous per-IP cap: blocks floods, never blocks real browsing.
+        if (isRateLimited(`analytics:${ip}`, 300, 60 * 60 * 1000)) {
+          return { tracked: false } as const;
+        }
+        await db.trackPageView(input.path, input.referrer);
+        return { tracked: true } as const;
+      }),
+
+    stats: adminProcedure.query(async () => db.getAnalyticsStats()),
+  }),
+
   orders: router({
     myOrders: protectedProcedure.query(async ({ ctx }) => {
       return await db.getUserOrders(ctx.user.id);

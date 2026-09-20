@@ -1,9 +1,11 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { useEffect } from "react";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { trpc } from "@/lib/trpc";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import LessonView from "./pages/LessonView";
@@ -12,6 +14,22 @@ import MyCourses from "./pages/MyCourses";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
+
+/** Fire-and-forget page view beacon on every route change. Cookieless. */
+function PageViewTracker() {
+  const [location] = useLocation();
+  const track = trpc.analytics.track.useMutation();
+  useEffect(() => {
+    try {
+      track.mutate({ path: location, referrer: document.referrer || undefined });
+    } catch {
+      // Analytics must never break the page.
+    }
+    // Only re-fire when the route changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
+  return null;
+}
 
 function Router() {
   return (
@@ -37,6 +55,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
+          <PageViewTracker />
           <Router />
         </TooltipProvider>
       </ThemeProvider>
