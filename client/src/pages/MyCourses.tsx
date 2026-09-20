@@ -130,7 +130,7 @@ export default function MyCourses() {
                       </div>
                     </CardContent>
                     <div className="p-6 pt-0">
-                      <Button className="w-full">
+                      <Button className="w-full" onClick={() => setLocation(`/courses/${course.id}`)}>
                         Continue Learning
                       </Button>
                     </div>

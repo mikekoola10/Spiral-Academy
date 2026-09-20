@@ -194,7 +194,8 @@ export default function Courses() {
                 return (
                   <Card
                     key={course.id}
-                    className="group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-600/10"
+                    onClick={() => setLocation(`/courses/${course.id}`)}
+                    className="group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-600/10 cursor-pointer"
                   >
                     {course.imageUrl && (
                       <div className="aspect-video w-full overflow-hidden bg-muted">
@@ -235,15 +236,15 @@ export default function Courses() {
                         {parseFloat(course.price).toFixed(2)}
                       </div>
                       {isEnrolled ? (
-                        <Button variant="outline" onClick={() => setLocation("/my-courses")}>
+                        <Button variant="outline" onClick={(e) => { e.stopPropagation(); setLocation(`/courses/${course.id}`); }}>
                           Go to Course
                         </Button>
                       ) : (
                         <Button
                           className="group/btn shadow-md shadow-violet-600/20"
-                          onClick={() => setLocation(`/checkout/${course.id}`)}
+                          onClick={(e) => { e.stopPropagation(); setLocation(`/courses/${course.id}`); }}
                         >
-                          Enroll Now
+                          View Course
                           <ArrowRight className="ml-1.5 h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
                         </Button>
                       )}

@@ -20,7 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
-import { Loader2, BookOpen, ShoppingCart, Users, Plus, ArrowLeft, Trash2 } from "lucide-react";
+import CurriculumManager from "@/components/admin/CurriculumManager";
+import { Loader2, BookOpen, ShoppingCart, Users, Plus, ArrowLeft, Trash2, Pencil } from "lucide-react";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -53,6 +54,21 @@ export default function Admin() {
   });
 
   const [courseToDelete, setCourseToDelete] = useState<{ id: number; title: string } | null>(null);
+  const [courseToEdit, setCourseToEdit] = useState<{
+    id: number; title: string; description: string; price: string;
+    currency: string; imageUrl: string; duration: string;
+    level: 'beginner' | 'intermediate' | 'advanced'; isActive: boolean;
+  } | null>(null);
+  const updateCourse = trpc.courses.update.useMutation({
+    onSuccess: () => {
+      toast.success('Course updated');
+      setCourseToEdit(null);
+      utils.courses.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
   const deleteCourse = trpc.courses.delete.useMutation({
     onSuccess: () => {
       toast.success('Course deleted');
@@ -196,6 +212,7 @@ export default function Admin() {
               <TabsTrigger value="orders">Orders</TabsTrigger>
               <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
               <TabsTrigger value="courses">Courses</TabsTrigger>
+              <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             </TabsList>
 
             <TabsContent value="orders" className="space-y-4">
@@ -421,6 +438,24 @@ export default function Admin() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                aria-label={`Edit ${course.title}`}
+                                onClick={() => setCourseToEdit({
+                                  id: course.id,
+                                  title: course.title,
+                                  description: course.description ?? "",
+                                  price: String(course.price),
+                                  currency: course.currency,
+                                  imageUrl: course.imageUrl ?? "",
+                                  duration: course.duration ?? "",
+                                  level: course.level as 'beginner' | 'intermediate' | 'advanced',
+                                  isActive: course.isActive,
+                                })}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 aria-label={`Delete ${course.title}`}
                                 onClick={() => setCourseToDelete({ id: course.id, title: course.title })}
                               >
@@ -441,6 +476,9 @@ export default function Admin() {
                 </CardContent>
               </Card>
             </TabsContent>
+            <TabsContent value="curriculum" className="space-y-4">
+              <CurriculumManager />
+            </TabsContent>
           </Tabs>
         </div>
       </section>
@@ -450,8 +488,8 @@ export default function Admin() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete course?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{courseToDelete?.title}" along with its orders,
-              enrollments, and payment logs. This cannot be undone.
+              This will permanently delete "{courseToDelete?.title}" along with its curriculum,
+              orders, enrollments, and payment logs. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -466,6 +504,116 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={courseToEdit !== null} onOpenChange={(open) => { if (!open) setCourseToEdit(null); }}>
+        <DialogContent className="max-w-2xl">
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!courseToEdit) return;
+            updateCourse.mutate({
+              id: courseToEdit.id,
+              title: courseToEdit.title,
+              description: courseToEdit.description || null,
+              price: courseToEdit.price,
+              currency: courseToEdit.currency,
+              imageUrl: courseToEdit.imageUrl || null,
+              duration: courseToEdit.duration || null,
+              level: courseToEdit.level,
+              isActive: courseToEdit.isActive,
+            });
+          }}>
+            <DialogHeader>
+              <DialogTitle>Edit Course</DialogTitle>
+              <DialogDescription>Update the course details below.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Title *</Label>
+                <Input
+                  required
+                  value={courseToEdit?.title ?? ""}
+                  onChange={(e) => setCourseToEdit((c) => c && { ...c, title: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Description</Label>
+                <Textarea
+                  rows={3}
+                  value={courseToEdit?.description ?? ""}
+                  onChange={(e) => setCourseToEdit((c) => c && { ...c, description: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Price *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={courseToEdit?.price ?? ""}
+                    onChange={(e) => setCourseToEdit((c) => c && { ...c, price: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Currency</Label>
+                  <Input
+                    value={courseToEdit?.currency ?? ""}
+                    onChange={(e) => setCourseToEdit((c) => c && { ...c, currency: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Image URL</Label>
+                <Input
+                  type="url"
+                  value={courseToEdit?.imageUrl ?? ""}
+                  onChange={(e) => setCourseToEdit((c) => c && { ...c, imageUrl: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Duration</Label>
+                  <Input
+                    value={courseToEdit?.duration ?? ""}
+                    onChange={(e) => setCourseToEdit((c) => c && { ...c, duration: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Level</Label>
+                  <Select
+                    value={courseToEdit?.level ?? "beginner"}
+                    onValueChange={(v: 'beginner' | 'intermediate' | 'advanced') =>
+                      setCourseToEdit((c) => c && { ...c, level: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={courseToEdit?.isActive ?? true}
+                  onChange={(e) => setCourseToEdit((c) => c && { ...c, isActive: e.target.checked })}
+                  className="h-4 w-4"
+                />
+                Active (visible in catalog)
+              </label>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCourseToEdit(null)}>Cancel</Button>
+              <Button type="submit" disabled={updateCourse.isPending}>
+                {updateCourse.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -154,6 +154,30 @@ export const appRouter = router({
         return await db.createCourse(input);
       }),
 
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        price: z.string().optional(),
+        currency: z.string().optional(),
+        imageUrl: z.string().nullable().optional(),
+        duration: z.string().nullable().optional(),
+        level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updates } = input;
+        try {
+          return await db.updateCourse(id, updates);
+        } catch (err) {
+          if (err instanceof Error && err.message === "Course not found") {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
+          }
+          throw err;
+        }
+      }),
+
     delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
@@ -165,6 +189,150 @@ export const appRouter = router({
           }
           throw err;
         }
+        return { success: true };
+      }),
+  }),
+
+  curriculum: router({
+    /**
+     * Full curriculum for a course. Lesson content is only included when the
+     * caller is enrolled, is an admin, or the lesson is a free preview.
+     * Everyone else sees the outline (titles, durations) with content: null.
+     */
+    getByCourse: publicProcedure
+      .input(z.object({ courseId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const user = (ctx as { user?: { id: number; role: string } }).user;
+        const isAdmin = user?.role === 'admin';
+        const enrolled = user ? await db.checkEnrollment(user.id, input.courseId) : false;
+        const fullAccess = Boolean(isAdmin || enrolled);
+
+        const curriculum = await db.getCourseCurriculum(input.courseId);
+        return curriculum.map((m) => ({
+          ...m,
+          lessons: m.lessons.map((l) => ({
+            ...l,
+            content: fullAccess || l.isFreePreview ? l.content : null,
+          })),
+        }));
+      }),
+
+    /** Single lesson with content, gated the same way as getByCourse. */
+    getLesson: publicProcedure
+      .input(z.object({ lessonId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const lesson = await db.getLessonById(input.lessonId);
+        if (!lesson) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
+        }
+        const module = await db.getModuleById(lesson.moduleId);
+        if (!module) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
+        }
+
+        const user = (ctx as { user?: { id: number; role: string } }).user;
+        const isAdmin = user?.role === 'admin';
+        const enrolled = user ? await db.checkEnrollment(user.id, module.courseId) : false;
+        const canView = Boolean(isAdmin || enrolled || lesson.isFreePreview);
+        if (!canView) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Enroll to view this lesson' });
+        }
+        return { ...lesson, courseId: module.courseId };
+      }),
+
+    /** Completed lesson IDs + totals for the signed-in user in a course. */
+    myProgress: protectedProcedure
+      .input(z.object({ courseId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const completedIds = await db.getCompletedLessonIds(ctx.user.id, input.courseId);
+        const curriculum = await db.getCourseCurriculum(input.courseId);
+        const totalLessons = curriculum.reduce((n, m) => n + m.lessons.length, 0);
+        return { completedIds, totalLessons };
+      }),
+
+    markComplete: protectedProcedure
+      .input(z.object({ lessonId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const lesson = await db.getLessonById(input.lessonId);
+        if (!lesson) throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
+        const module = await db.getModuleById(lesson.moduleId);
+        if (!module) throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
+        const isAdmin = ctx.user.role === 'admin';
+        const enrolled = await db.checkEnrollment(ctx.user.id, module.courseId);
+        if (!isAdmin && !enrolled) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Enroll to track progress' });
+        }
+        await db.markLessonComplete(ctx.user.id, input.lessonId);
+        return { success: true };
+      }),
+
+    markIncomplete: protectedProcedure
+      .input(z.object({ lessonId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.markLessonIncomplete(ctx.user.id, input.lessonId);
+        return { success: true };
+      }),
+
+    // ---- Admin management ----
+    createModule: adminProcedure
+      .input(z.object({
+        courseId: z.number(),
+        title: z.string().min(1),
+        description: z.string().optional(),
+        position: z.number().int().default(0),
+      }))
+      .mutation(async ({ input }) => db.createModule(input)),
+
+    updateModule: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        position: z.number().int().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updates } = input;
+        return db.updateModule(id, updates);
+      }),
+
+    deleteModule: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteModule(input.id);
+        return { success: true };
+      }),
+
+    createLesson: adminProcedure
+      .input(z.object({
+        moduleId: z.number(),
+        title: z.string().min(1),
+        content: z.string().optional(),
+        videoUrl: z.string().optional(),
+        durationMinutes: z.number().int().positive().optional(),
+        position: z.number().int().default(0),
+        isFreePreview: z.boolean().default(false),
+      }))
+      .mutation(async ({ input }) => db.createLesson(input)),
+
+    updateLesson: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().min(1).optional(),
+        content: z.string().nullable().optional(),
+        videoUrl: z.string().nullable().optional(),
+        durationMinutes: z.number().int().positive().nullable().optional(),
+        position: z.number().int().optional(),
+        isFreePreview: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updates } = input;
+        return db.updateLesson(id, updates);
+      }),
+
+    deleteLesson: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteLesson(input.id);
         return { success: true };
       }),
   }),

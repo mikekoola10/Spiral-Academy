@@ -3,7 +3,7 @@ import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { neon } from "@neondatabase/serverless";
 import { Pool } from "pg";
-import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog } from "../drizzle/schema";
+import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog, modules, Module, InsertModule, lessons, Lesson, InsertLesson, lessonProgress, InsertLessonProgress } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 type Db = ReturnType<typeof drizzleNeon> | ReturnType<typeof drizzleNodePg>;
@@ -157,6 +157,159 @@ export async function deleteCourse(courseId: number): Promise<void> {
   await db.delete(enrollments).where(eq(enrollments.courseId, courseId));
   await db.delete(orders).where(eq(orders.courseId, courseId));
   await db.delete(courses).where(eq(courses.id, courseId));
+}
+
+// ==================== Curriculum Helpers ====================
+
+export async function updateCourse(courseId: number, updates: Partial<InsertCourse>): Promise<Course> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [updated] = await db
+    .update(courses)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(courses.id, courseId))
+    .returning();
+  if (!updated) throw new Error("Course not found");
+  return updated;
+}
+
+export interface CurriculumModule extends Module {
+  lessons: Lesson[];
+}
+
+export async function getCourseCurriculum(courseId: number): Promise<CurriculumModule[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const mods = await db
+    .select()
+    .from(modules)
+    .where(eq(modules.courseId, courseId))
+    .orderBy(modules.position, modules.id);
+
+  return await Promise.all(
+    mods.map(async (m) => ({
+      ...m,
+      lessons: await db
+        .select()
+        .from(lessons)
+        .where(eq(lessons.moduleId, m.id))
+        .orderBy(lessons.position, lessons.id),
+    }))
+  );
+}
+
+export async function createModule(data: InsertModule): Promise<Module> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [created] = await db.insert(modules).values(data).returning();
+  if (!created) throw new Error("Failed to create module");
+  return created;
+}
+
+export async function updateModule(moduleId: number, updates: Partial<InsertModule>): Promise<Module> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [updated] = await db
+    .update(modules)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(modules.id, moduleId))
+    .returning();
+  if (!updated) throw new Error("Module not found");
+  return updated;
+}
+
+export async function deleteModule(moduleId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Lessons and their progress rows cascade via foreign keys.
+  await db.delete(modules).where(eq(modules.id, moduleId));
+}
+
+export async function createLesson(data: InsertLesson): Promise<Lesson> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [created] = await db.insert(lessons).values(data).returning();
+  if (!created) throw new Error("Failed to create lesson");
+  return created;
+}
+
+export async function updateLesson(lessonId: number, updates: Partial<InsertLesson>): Promise<Lesson> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [updated] = await db
+    .update(lessons)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(lessons.id, lessonId))
+    .returning();
+  if (!updated) throw new Error("Lesson not found");
+  return updated;
+}
+
+export async function deleteLesson(lessonId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Progress rows cascade via foreign key.
+  await db.delete(lessons).where(eq(lessons.id, lessonId));
+}
+
+export async function getModuleById(moduleId: number): Promise<Module | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(modules).where(eq(modules.id, moduleId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getLessonById(lessonId: number): Promise<Lesson | undefined> {  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(lessons).where(eq(lessons.id, lessonId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function markLessonComplete(userId: number, lessonId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db
+    .select({ id: lessonProgress.id })
+    .from(lessonProgress)
+    .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.lessonId, lessonId)))
+    .limit(1);
+  if (existing.length === 0) {
+    const row: InsertLessonProgress = { userId, lessonId };
+    await db.insert(lessonProgress).values(row);
+  }
+}
+
+export async function markLessonIncomplete(userId: number, lessonId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(lessonProgress)
+    .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.lessonId, lessonId)));
+}
+
+export async function getCompletedLessonIds(userId: number, courseId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({ lessonId: lessonProgress.lessonId })
+    .from(lessonProgress)
+    .innerJoin(lessons, eq(lessonProgress.lessonId, lessons.id))
+    .innerJoin(modules, eq(lessons.moduleId, modules.id))
+    .where(and(eq(lessonProgress.userId, userId), eq(modules.courseId, courseId)));
+  return rows.map((r) => r.lessonId);
 }
 
 // ==================== Order Helpers ====================

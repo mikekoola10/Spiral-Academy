@@ -125,3 +125,60 @@ export const paymentLogs = pgTable("paymentLogs", {
 
 export type PaymentLog = typeof paymentLogs.$inferSelect;
 export type InsertPaymentLog = typeof paymentLogs.$inferInsert;
+
+/**
+ * Modules - group lessons within a course (the curriculum outline)
+ */
+export const modules = pgTable("modules", {
+  id: serial("id").primaryKey(),
+  courseId: integer("courseId")
+    .notNull()
+    .references(() => courses.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  position: integer("position").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Module = typeof modules.$inferSelect;
+export type InsertModule = typeof modules.$inferInsert;
+
+/**
+ * Lessons - individual content units inside a module.
+ * Content is markdown rendered on the lesson page.
+ */
+export const lessons = pgTable("lessons", {
+  id: serial("id").primaryKey(),
+  moduleId: integer("moduleId")
+    .notNull()
+    .references(() => modules.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content"),
+  videoUrl: text("videoUrl"),
+  durationMinutes: integer("durationMinutes"),
+  position: integer("position").default(0).notNull(),
+  isFreePreview: boolean("isFreePreview").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Lesson = typeof lessons.$inferSelect;
+export type InsertLesson = typeof lessons.$inferInsert;
+
+/**
+ * Lesson progress - which lessons a user has completed
+ */
+export const lessonProgress = pgTable("lessonProgress", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  lessonId: integer("lessonId")
+    .notNull()
+    .references(() => lessons.id, { onDelete: "cascade" }),
+  completedAt: timestamp("completedAt").defaultNow().notNull(),
+});
+
+export type LessonProgress = typeof lessonProgress.$inferSelect;
+export type InsertLessonProgress = typeof lessonProgress.$inferInsert;

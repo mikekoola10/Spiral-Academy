@@ -5,6 +5,8 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Courses from "./pages/Courses";
+import CourseDetail from "./pages/CourseDetail";
+import LessonView from "./pages/LessonView";
 import Checkout from "./pages/Checkout";
 import MyCourses from "./pages/MyCourses";
 import PaymentSuccess from "./pages/PaymentSuccess";
@@ -15,6 +17,8 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Courses} />
+      <Route path={"/courses/:id"} component={CourseDetail} />
+      <Route path={"/courses/:id/lessons/:lessonId"} component={LessonView} />
       <Route path={"/login"} component={Login} />
       <Route path={"/checkout/:id"} component={Checkout} />
       <Route path={"/payment-success"} component={PaymentSuccess} />
