@@ -13,6 +13,8 @@ import {
   ShieldCheck,
   GraduationCap,
   LogOut,
+  Package,
+  BadgePercent,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
@@ -21,11 +23,17 @@ export default function Courses() {
   const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { data: courses, isLoading } = trpc.courses.list.useQuery();
+  const { data: bundle } = trpc.payments.getBundle.useQuery();
   const { data: enrollments } = trpc.enrollments.myEnrollments.useQuery(undefined, {
     enabled: isAuthenticated,
   });
 
   const enrolledCourseIds = new Set(enrollments?.map(e => e.courseId) || []);
+  const bundleOwnedCount = bundle?.courses.filter(c => enrolledCourseIds.has(c.id)).length ?? 0;
+  const showBundle = !!bundle && bundle.count > 1 && bundleOwnedCount < bundle.count;
+  const bundleSavePct = bundle && bundle.totalValue > 0
+    ? Math.round((1 - bundle.price / bundle.totalValue) * 100)
+    : 0;
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -143,6 +151,54 @@ export default function Courses() {
           </div>
         </div>
       </section>
+
+      {/* Bundle banner */}
+      {showBundle && bundle && (
+        <section className="border-b">
+          <div className="container py-10">
+            <div className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-600/[0.12] via-indigo-600/[0.08] to-transparent p-8 md:p-10">
+              <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" aria-hidden="true" />
+              <div className="relative flex flex-col md:flex-row md:items-center gap-6">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 shadow-lg shadow-violet-600/30">
+                  <Package className="h-7 w-7 text-white" />
+                </span>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Badge className="bg-violet-600 hover:bg-violet-600 text-white border-0">
+                      <BadgePercent className="h-3.5 w-3.5 mr-1" />
+                      Save {bundleSavePct}%
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      Limited launch pricing
+                    </span>
+                  </div>
+                  <h2 className="font-display text-2xl md:text-3xl font-bold tracking-tight mb-2">
+                    The Complete Bundle
+                  </h2>
+                  <p className="text-muted-foreground max-w-xl">
+                    All {bundle.count} courses —{" "}
+                    <span className="line-through">${bundle.totalValue.toFixed(2)} value</span>{" "}
+                    — for <span className="font-semibold text-foreground">${bundle.price.toFixed(2)}</span>.
+                    Use code <span className="font-mono font-semibold text-violet-700 dark:text-violet-300">LAUNCH30</span> at
+                    checkout for an extra 30% off.
+                    {bundleOwnedCount > 0 && (
+                      <> You already own {bundleOwnedCount} of {bundle.count} — the bundle covers the rest.</>
+                    )}
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  className="shrink-0 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-600/25"
+                  onClick={() => setLocation("/checkout/bundle")}
+                >
+                  Get the Bundle
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Value props */}
       <section className="border-y bg-muted/40">

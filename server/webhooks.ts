@@ -4,7 +4,10 @@ import * as db from './db';
 import type Stripe from 'stripe';
 
 /**
- * Grant course access after successful payment
+ * Grant course access after successful payment.
+ * Handles both single-course orders (courseId) and bundle orders
+ * (bundleCourseIds JSON array) - enrolls the user in every course
+ * they don't already have.
  */
 async function grantCourseAccess(orderId: number) {
   const order = await db.getOrderById(orderId);
@@ -13,25 +16,38 @@ async function grantCourseAccess(orderId: number) {
     return;
   }
 
-  // Check if already enrolled
-  const isEnrolled = await db.checkEnrollment(order.userId, order.courseId);
-  if (isEnrolled) {
-    console.log(`[Webhook] User ${order.userId} already enrolled in course ${order.courseId}`);
-    return;
+  let courseIds: number[] = [];
+  if (order.bundleCourseIds) {
+    try {
+      const parsed: unknown = JSON.parse(order.bundleCourseIds);
+      if (Array.isArray(parsed)) {
+        courseIds = parsed.filter((n): n is number => typeof n === "number");
+      }
+    } catch {
+      console.error(`[Webhook] Order ${orderId} has invalid bundleCourseIds`);
+    }
+  } else if (order.courseId) {
+    courseIds = [order.courseId];
   }
 
-  // Create enrollment
-  await db.createEnrollment({
-    userId: order.userId,
-    courseId: order.courseId,
-    orderId: order.id,
-    isActive: true,
-  });
+  for (const courseId of courseIds) {
+    const isEnrolled = await db.checkEnrollment(order.userId, courseId);
+    if (isEnrolled) {
+      console.log(`[Webhook] User ${order.userId} already enrolled in course ${courseId}`);
+      continue;
+    }
+
+    await db.createEnrollment({
+      userId: order.userId,
+      courseId,
+      orderId: order.id,
+      isActive: true,
+    });
+    console.log(`[Webhook] Granted course access: User ${order.userId} enrolled in course ${courseId}`);
+  }
 
   // Update order status
   await db.updateOrderStatus(orderId, 'completed', new Date());
-
-  console.log(`[Webhook] Granted course access: User ${order.userId} enrolled in course ${order.courseId}`);
 }
 
 /**

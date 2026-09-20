@@ -3,7 +3,7 @@ import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { neon } from "@neondatabase/serverless";
 import { Pool } from "pg";
-import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog, modules, Module, InsertModule, lessons, Lesson, InsertLesson, lessonProgress, InsertLessonProgress } from "../drizzle/schema";
+import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog, modules, Module, InsertModule, lessons, Lesson, InsertLesson, lessonProgress, InsertLessonProgress, emailSubscribers, promoCodes, InsertPromoCode } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 type Db = ReturnType<typeof drizzleNeon> | ReturnType<typeof drizzleNodePg>;
@@ -422,6 +422,84 @@ export async function getAllEnrollments(): Promise<Enrollment[]> {
   if (!db) return [];
 
   return await db.select().from(enrollments).orderBy(desc(enrollments.enrolledAt));
+}
+
+// ==================== Newsletter / Lead Capture ====================
+
+/**
+ * Add an email to the subscriber list. Idempotent: returns created=false
+ * when the email is already subscribed.
+ */
+export async function subscribeEmail(email: string, source?: string): Promise<{ created: boolean }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db
+    .select({ id: emailSubscribers.id })
+    .from(emailSubscribers)
+    .where(eq(emailSubscribers.email, email))
+    .limit(1);
+  if (existing.length > 0) return { created: false };
+
+  try {
+    await db.insert(emailSubscribers).values({ email, source: source ?? null });
+    return { created: true };
+  } catch (err: any) {
+    // Lost a race with a concurrent subscribe: the unique constraint already
+    // holds this email, so treat it as already subscribed.
+    if (err?.code === "23505" || /duplicate|unique/i.test(String(err?.message ?? ""))) {
+      return { created: false };
+    }
+    throw err;
+  }
+}
+
+export async function getAllSubscribers() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(emailSubscribers).orderBy(desc(emailSubscribers.createdAt));
+}
+
+// ==================== Promo Codes ====================
+
+/** Find a usable promo code by code string (case-insensitive). */
+export async function getPromoCode(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const normalized = code.trim().toUpperCase();
+  const result = await db.select().from(promoCodes).where(eq(promoCodes.code, normalized)).limit(1);
+  const promo = result[0];
+  if (!promo || !promo.isActive) return undefined;
+  if (promo.expiresAt && promo.expiresAt < new Date()) return undefined;
+  return promo;
+}
+
+export async function getAllPromoCodes() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt));
+}
+
+export async function createPromoCode(data: InsertPromoCode) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [created] = await db
+    .insert(promoCodes)
+    .values({ ...data, code: data.code.trim().toUpperCase() })
+    .returning();
+  if (!created) throw new Error("Failed to create promo code");
+  return created;
+}
+
+export async function setPromoCodeActive(id: number, isActive: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(promoCodes).set({ isActive }).where(eq(promoCodes.id, id));
 }
 
 // ==================== Payment Log Helpers ====================

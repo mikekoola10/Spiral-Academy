@@ -7,19 +7,22 @@ const getStripe = () => {
     throw new Error('STRIPE_SECRET_KEY is not configured');
   }
   return new Stripe(secretKey, {
-    apiVersion: '2025-12-15.clover',
+    apiVersion: '2026-02-25.clover',
   });
 };
 
 /**
- * Create a Stripe PaymentIntent for a course purchase
+ * Create a Stripe PaymentIntent for a course or bundle purchase
  */
 export async function createStripePaymentIntent(params: {
   amount: number; // in dollars
   currency: string;
-  courseId: number;
+  courseId?: number | null;
   userId: number;
   customerEmail?: string;
+  isBundle?: boolean;
+  bundleCourseIds?: number[];
+  promoCode?: string;
 }) {
   const stripe = getStripe();
   
@@ -27,8 +30,12 @@ export async function createStripePaymentIntent(params: {
     amount: Math.round(params.amount * 100), // Convert to cents
     currency: params.currency.toLowerCase(),
     metadata: {
-      courseId: params.courseId.toString(),
+      ...(params.courseId ? { courseId: params.courseId.toString() } : {}),
       userId: params.userId.toString(),
+      ...(params.isBundle
+        ? { bundle: "true", bundleCourseIds: JSON.stringify(params.bundleCourseIds ?? []) }
+        : {}),
+      ...(params.promoCode ? { promoCode: params.promoCode } : {}),
     },
     receipt_email: params.customerEmail,
   });

@@ -20,6 +20,7 @@ function Router() {
       <Route path={"/courses/:id"} component={CourseDetail} />
       <Route path={"/courses/:id/lessons/:lessonId"} component={LessonView} />
       <Route path={"/login"} component={Login} />
+      <Route path={"/checkout/bundle"} component={Checkout} />
       <Route path={"/checkout/:id"} component={Checkout} />
       <Route path={"/payment-success"} component={PaymentSuccess} />
       <Route path={"/my-courses"} component={MyCourses} />

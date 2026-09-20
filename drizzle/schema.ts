@@ -72,16 +72,22 @@ export type Course = typeof courses.$inferSelect;
 export type InsertCourse = typeof courses.$inferInsert;
 
 /**
- * Orders table - tracks all payment attempts
+ * Orders table - tracks all payment attempts.
+ * Single-course orders set courseId; bundle orders leave courseId null
+ * and store the purchased course IDs as JSON in bundleCourseIds.
  */
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
-  courseId: integer("courseId").notNull(),
+  courseId: integer("courseId"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).notNull(),
   paymentMethod: paymentMethodEnum("paymentMethod").notNull(),
   paymentStatus: paymentStatusEnum("paymentStatus").default("pending").notNull(),
+  // Promo code applied at checkout (e.g. LAUNCH30), if any.
+  promoCode: varchar("promoCode", { length: 64 }),
+  // JSON array of course IDs for bundle orders; null for single-course orders.
+  bundleCourseIds: text("bundleCourseIds"),
   // Payment gateway specific IDs
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
   cryptoPaymentId: varchar("cryptoPaymentId", { length: 255 }),
@@ -94,6 +100,34 @@ export const orders = pgTable("orders", {
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
+
+/**
+ * Email subscribers - lead capture from free preview lessons and site forms.
+ */
+export const emailSubscribers = pgTable("emailSubscribers", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  source: varchar("source", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EmailSubscriber = typeof emailSubscribers.$inferSelect;
+export type InsertEmailSubscriber = typeof emailSubscribers.$inferInsert;
+
+/**
+ * Promo codes - percentage discounts applied at checkout (e.g. LAUNCH30).
+ */
+export const promoCodes = pgTable("promoCodes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 64 }).notNull().unique(),
+  percentOff: integer("percentOff").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  expiresAt: timestamp("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = typeof promoCodes.$inferInsert;
 
 /**
  * Enrollments table - manages course access

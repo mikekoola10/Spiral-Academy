@@ -51,6 +51,36 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+/** Flat price (USD) for the "Complete Bundle" of every active course. */
+export const BUNDLE_PRICE_USD = 499;
+
+async function getBundleDetails() {
+  const courses = await db.getAllCourses();
+  const totalValue = courses.reduce((sum, c) => sum + parseFloat(c.price), 0);
+  return {
+    courses,
+    count: courses.length,
+    totalValue: Math.round(totalValue * 100) / 100,
+    price: BUNDLE_PRICE_USD,
+  };
+}
+
+/** Apply a percentage promo to an amount; returns final amount + discount. */
+function applyPromo(amount: number, promo?: { percentOff: number }) {
+  if (!promo) return { finalAmount: amount, discount: 0 };
+  const discount = Math.round(amount * (promo.percentOff / 100) * 100) / 100;
+  return { finalAmount: Math.round((amount - discount) * 100) / 100, discount };
+}
+
+async function resolvePromo(promoCode?: string) {
+  if (!promoCode) return undefined;
+  const promo = await db.getPromoCode(promoCode);
+  if (!promo) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: "That promo code isn't valid." });
+  }
+  return promo;
+}
+
 // Public user shape returned to clients. The password hash must never
 // leave the server.
 function toPublicUser(user: User) {
@@ -400,9 +430,13 @@ export const appRouter = router({
   }),
 
   payments: router({
+    /** Public bundle details: every active course for one flat price. */
+    getBundle: publicProcedure.query(async () => getBundleDetails()),
+
     createStripeIntent: protectedProcedure
       .input(z.object({
         courseId: z.number(),
+        promoCode: z.string().trim().max(64).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!isStripeConfigured()) {
@@ -424,24 +458,29 @@ export const appRouter = router({
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Already enrolled in this course' });
         }
 
+        const promo = await resolvePromo(input.promoCode);
+        const { finalAmount, discount } = applyPromo(parseFloat(course.price), promo);
+
         // Create order record
         const order = await db.createOrder({
           userId: ctx.user.id,
           courseId: input.courseId,
-          amount: course.price,
+          amount: finalAmount.toFixed(2),
           currency: course.currency,
           paymentMethod: 'stripe',
           paymentStatus: 'pending',
+          promoCode: promo?.code ?? null,
           customerEmail: ctx.user.email || undefined,
         });
 
         // Create Stripe PaymentIntent
         const paymentIntent = await createStripePaymentIntent({
-          amount: parseFloat(course.price),
+          amount: finalAmount,
           currency: course.currency,
           courseId: input.courseId,
           userId: ctx.user.id,
           customerEmail: ctx.user.email || undefined,
+          promoCode: promo?.code,
         });
 
         // Update order with Stripe PaymentIntent ID
@@ -456,11 +495,143 @@ export const appRouter = router({
         return {
           clientSecret: paymentIntent.client_secret,
           orderId: order.id,
+          discount,
+          finalAmount,
+        };
+      }),
+
+    /**
+     * Create a PaymentIntent for the Complete Bundle (all active courses,
+     * one flat price). Enrolls the buyer in every course they don't own yet.
+     */
+    createBundleIntent: protectedProcedure
+      .input(z.object({
+        promoCode: z.string().trim().max(64).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!isStripeConfigured()) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Stripe is not configured. Please add your Stripe API keys.'
+          });
+        }
+
+        const { courses } = await getBundleDetails();
+        if (courses.length === 0) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No courses available for the bundle.' });
+        }
+
+        const missing: number[] = [];
+        for (const c of courses) {
+          if (!(await db.checkEnrollment(ctx.user.id, c.id))) missing.push(c.id);
+        }
+        if (missing.length === 0) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'You already own every course in the bundle.' });
+        }
+
+        const promo = await resolvePromo(input.promoCode);
+        const { finalAmount, discount } = applyPromo(BUNDLE_PRICE_USD, promo);
+
+        const order = await db.createOrder({
+          userId: ctx.user.id,
+          courseId: null,
+          bundleCourseIds: JSON.stringify(missing),
+          amount: finalAmount.toFixed(2),
+          currency: 'USD',
+          paymentMethod: 'stripe',
+          paymentStatus: 'pending',
+          promoCode: promo?.code ?? null,
+          customerEmail: ctx.user.email || undefined,
+        });
+
+        const paymentIntent = await createStripePaymentIntent({
+          amount: finalAmount,
+          currency: 'USD',
+          userId: ctx.user.id,
+          customerEmail: ctx.user.email || undefined,
+          isBundle: true,
+          bundleCourseIds: missing,
+          promoCode: promo?.code,
+        });
+
+        const database = await db.getDb();
+        if (database) {
+          await database.update(orders).set({
+            stripePaymentIntentId: paymentIntent.id,
+            updatedAt: new Date(),
+          }).where(eq(orders.id, order.id));
+        }
+
+        return {
+          clientSecret: paymentIntent.client_secret,
+          orderId: order.id,
+          discount,
+          finalAmount,
+          courseCount: missing.length,
         };
       }),
 
     // Webhook handler will be implemented as Express route, not tRPC
     // This is because webhooks need raw body for signature verification
+  }),
+
+  /** Email lead capture (free previews, site forms). */
+  newsletter: router({
+    subscribe: publicProcedure
+      .input(z.object({
+        email: z.string().trim().min(3).max(320).email("Enter a valid email address"),
+        source: z.string().trim().max(64).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const ip = ctx.req.ip ?? "unknown";
+        if (isRateLimited(`newsletter:${ip}`, 5, 60 * 60 * 1000)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many attempts. Try again later." });
+        }
+        const { created } = await db.subscribeEmail(input.email.toLowerCase(), input.source);
+        return { subscribed: true, isNew: created } as const;
+      }),
+
+    list: adminProcedure.query(async () => db.getAllSubscribers()),
+  }),
+
+  /** Promo codes: public validation + admin management. */
+  promos: router({
+    validate: publicProcedure
+      .input(z.object({ code: z.string().trim().min(1).max(64) }))
+      .query(async ({ input }) => {
+        const promo = await db.getPromoCode(input.code);
+        if (!promo) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: "That promo code isn't valid." });
+        }
+        return { code: promo.code, percentOff: promo.percentOff };
+      }),
+
+    list: adminProcedure.query(async () => db.getAllPromoCodes()),
+
+    create: adminProcedure
+      .input(z.object({
+        code: z.string().trim().min(2).max(64),
+        percentOff: z.number().int().min(1).max(90),
+        expiresAt: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          return await db.createPromoCode({
+            code: input.code,
+            percentOff: input.percentOff,
+            expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+          });
+        } catch {
+          throw new TRPCError({ code: 'CONFLICT', message: 'That code already exists.' });
+        }
+      }),
+
+    setActive: adminProcedure
+      .input(z.object({ id: z.number(), isActive: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await db.setPromoCodeActive(input.id, input.isActive);
+        return { success: true } as const;
+      }),
   }),
 
   orders: router({

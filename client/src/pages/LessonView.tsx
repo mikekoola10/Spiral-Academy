@@ -1,8 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { Streamdown } from "streamdown";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
   Loader2,
   GraduationCap,
@@ -13,10 +16,83 @@ import {
   Lock,
   Sparkles,
   Clock,
+  Mail,
+  MailCheck,
 } from "lucide-react";
 import { useRoute, useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 import AuthNav from "@/components/AuthNav";
+
+function FreePreviewEmailCapture() {
+  const [email, setEmail] = useState("");
+  const [done, setDone] = useState(false);
+  const subscribe = trpc.newsletter.subscribe.useMutation({
+    onSuccess: () => {
+      setDone(true);
+      toast.success("You're on the list!");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    subscribe.mutate({ email: email.trim(), source: "free-preview" });
+  };
+
+  if (done) {
+    return (
+      <div className="mt-10 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.07] p-6 md:p-8 text-center">
+        <MailCheck className="h-8 w-8 mx-auto mb-3 text-emerald-600 dark:text-emerald-400" />
+        <h3 className="font-display text-xl font-bold mb-1">You're in!</h3>
+        <p className="text-sm text-muted-foreground">
+          Watch your inbox for more free lessons and launch discounts.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-10 rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-600/[0.08] to-indigo-600/[0.05] p-6 md:p-8">
+      <div className="flex items-start gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600">
+          <Mail className="h-5 w-5 text-white" />
+        </span>
+        <div className="flex-1">
+          <h3 className="font-display text-xl font-bold mb-1">
+            Enjoying this free lesson?
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Get more free lessons plus launch discounts — straight to your inbox. No spam, unsubscribe anytime.
+          </p>
+          <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2">
+            <Input
+              type="email"
+              required
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="flex-1 bg-background"
+            />
+            <Button
+              type="submit"
+              disabled={subscribe.isPending}
+              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+            >
+              {subscribe.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Send me free lessons"
+              )}
+            </Button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LessonView() {
   const [, params] = useRoute("/courses/:id/lessons/:lessonId");
@@ -164,6 +240,8 @@ export default function LessonView() {
         ) : (
           <p className="text-muted-foreground">Content for this lesson is coming soon.</p>
         )}
+
+        {lesson.isFreePreview && !isAuthenticated && <FreePreviewEmailCapture />}
 
         {isAuthenticated && (
           <div className="mt-10 flex justify-center">

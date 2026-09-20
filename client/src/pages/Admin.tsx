@@ -41,6 +41,45 @@ export default function Admin() {
 
   const { data: courses, isLoading: coursesLoading } = trpc.courses.list.useQuery();
 
+  const { data: subscribers } = trpc.newsletter.list.useQuery(undefined, {
+    enabled: isAuthenticated && user?.role === 'admin',
+  });
+
+  const { data: promos } = trpc.promos.list.useQuery(undefined, {
+    enabled: isAuthenticated && user?.role === 'admin',
+  });
+
+  const [newPromoCode, setNewPromoCode] = useState("");
+  const [newPromoPercent, setNewPromoPercent] = useState("30");
+  const createPromo = trpc.promos.create.useMutation({
+    onSuccess: () => {
+      toast.success('Promo code created');
+      setNewPromoCode("");
+      utils.promos.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+  const togglePromo = trpc.promos.setActive.useMutation({
+    onSuccess: () => {
+      utils.promos.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handleCreatePromo = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const pct = parseInt(newPromoPercent, 10);
+    if (!newPromoCode.trim() || isNaN(pct) || pct < 1 || pct > 90) {
+      toast.error("Enter a code and a percent between 1 and 90.");
+      return;
+    }
+    createPromo.mutate({ code: newPromoCode.trim(), percentOff: pct });
+  };
+
   const utils = trpc.useUtils();
   const createCourse = trpc.courses.create.useMutation({
     onSuccess: () => {
@@ -221,6 +260,8 @@ export default function Admin() {
               <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
               <TabsTrigger value="courses">Courses</TabsTrigger>
               <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+              <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
+              <TabsTrigger value="promos">Promo Codes</TabsTrigger>
             </TabsList>
 
             <TabsContent value="orders" className="space-y-4">
@@ -235,8 +276,9 @@ export default function Admin() {
                       <TableRow>
                         <TableHead>Order ID</TableHead>
                         <TableHead>User ID</TableHead>
-                        <TableHead>Course ID</TableHead>
+                        <TableHead>Item</TableHead>
                         <TableHead>Amount</TableHead>
+                        <TableHead>Promo</TableHead>
                         <TableHead>Method</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Date</TableHead>
@@ -248,11 +290,20 @@ export default function Admin() {
                           <TableRow key={order.id}>
                             <TableCell className="font-medium">#{order.id}</TableCell>
                             <TableCell>{order.userId}</TableCell>
-                            <TableCell>{order.courseId}</TableCell>
+                            <TableCell>
+                              {order.bundleCourseIds ? (
+                                <Badge variant="outline" className="border-violet-500/30 text-violet-700 dark:text-violet-400">
+                                  Bundle
+                                </Badge>
+                              ) : (
+                                order.courseId
+                              )}
+                            </TableCell>
                             <TableCell>
                               {order.currency === 'USD' ? '$' : order.currency}
                               {parseFloat(order.amount).toFixed(2)}
                             </TableCell>
+                            <TableCell className="font-mono text-xs">{order.promoCode ?? '—'}</TableCell>
                             <TableCell className="capitalize">{order.paymentMethod}</TableCell>
                             <TableCell>
                               <Badge className={getStatusColor(order.paymentStatus)}>
@@ -266,7 +317,7 @@ export default function Admin() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          <TableCell colSpan={8} className="text-center text-muted-foreground">
                             No orders yet
                           </TableCell>
                         </TableRow>
@@ -486,6 +537,138 @@ export default function Admin() {
             </TabsContent>
             <TabsContent value="curriculum" className="space-y-4">
               <CurriculumManager />
+            </TabsContent>
+
+            <TabsContent value="subscribers" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Email Subscribers</CardTitle>
+                  <CardDescription>
+                    Leads captured from free preview lessons. {subscribers?.length ?? 0} total.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Subscribed</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {subscribers && subscribers.length > 0 ? (
+                        subscribers.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-medium">{s.email}</TableCell>
+                            <TableCell>{s.source ?? '—'}</TableCell>
+                            <TableCell>
+                              {new Date(s.createdAt).toLocaleDateString()}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-muted-foreground">
+                            No subscribers yet — share a free preview lesson to start collecting emails.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="promos" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create Promo Code</CardTitle>
+                  <CardDescription>Percentage discount applied at checkout</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleCreatePromo} className="flex flex-col sm:flex-row gap-3 items-end">
+                    <div className="flex-1 w-full">
+                      <Label htmlFor="promo-code">Code</Label>
+                      <Input
+                        id="promo-code"
+                        placeholder="e.g. SUMMER20"
+                        value={newPromoCode}
+                        onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())}
+                      />
+                    </div>
+                    <div className="w-full sm:w-32">
+                      <Label htmlFor="promo-percent">% off</Label>
+                      <Input
+                        id="promo-percent"
+                        type="number"
+                        min={1}
+                        max={90}
+                        value={newPromoPercent}
+                        onChange={(e) => setNewPromoPercent(e.target.value)}
+                      />
+                    </div>
+                    <Button type="submit" disabled={createPromo.isPending}>
+                      {createPromo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                      Create
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Active Promo Codes</CardTitle>
+                  <CardDescription>LAUNCH30 was created automatically (30% off)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Discount</TableHead>
+                        <TableHead>Expires</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {promos && promos.length > 0 ? (
+                        promos.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-mono font-medium">{p.code}</TableCell>
+                            <TableCell>{p.percentOff}% off</TableCell>
+                            <TableCell>
+                              {p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : 'Never'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={p.isActive ? "default" : "secondary"}>
+                                {p.isActive ? 'Active' : 'Disabled'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={togglePromo.isPending}
+                                onClick={() => togglePromo.mutate({ id: p.id, isActive: !p.isActive })}
+                              >
+                                {p.isActive ? 'Disable' : 'Enable'}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            No promo codes yet
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>
