@@ -12,12 +12,13 @@ import {
   ArrowRight,
   ShieldCheck,
   GraduationCap,
+  LogOut,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 
 export default function Courses() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { data: courses, isLoading } = trpc.courses.list.useQuery();
   const { data: enrollments } = trpc.enrollments.myEnrollments.useQuery(undefined, {
@@ -74,8 +75,16 @@ export default function Courses() {
                     Admin
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => setLocation("/my-courses")}>
-                  {user?.name || user?.email}
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await logout();
+                    setLocation("/");
+                  }}
+                  title="Sign out"
+                >
+                  <LogOut className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Sign out</span>
                 </Button>
               </>
             ) : (

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useRoute, useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
+import AuthNav from "@/components/AuthNav";
 
 function levelColor(level: string) {
   switch (level) {
@@ -109,9 +110,12 @@ export default function CourseDetail() {
               Spiral.AI <span className="text-muted-foreground font-semibold">Academy</span>
             </span>
           </button>
-          <Button variant="ghost" onClick={() => setLocation("/")}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> All courses
-          </Button>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button variant="ghost" onClick={() => setLocation("/")}>
+              <ArrowLeft className="h-4 w-4 mr-2" /> All courses
+            </Button>
+            <AuthNav compact />
+          </div>
         </div>
       </header>
 

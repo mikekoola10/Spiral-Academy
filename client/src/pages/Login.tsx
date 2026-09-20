@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GraduationCap, LogIn, UserPlus } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 function friendlyError(message: string): string {
   // tRPC wraps zod/validation messages; surface the first readable one.
@@ -21,12 +22,20 @@ function friendlyError(message: string): string {
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const utils = trpc.useUtils();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Already signed in? Send them home instead of showing the form again.
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLocation("/");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
 
   const onSuccess = async () => {
     setError(null);

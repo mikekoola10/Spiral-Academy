@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useRoute, useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
+import AuthNav from "@/components/AuthNav";
 
 export default function LessonView() {
   const [, params] = useRoute("/courses/:id/lessons/:lessonId");
@@ -116,11 +117,14 @@ export default function LessonView() {
               Spiral.AI <span className="text-muted-foreground font-semibold">Academy</span>
             </span>
           </button>
-          <Button variant="ghost" onClick={() => setLocation(courseId ? `/courses/${courseId}` : "/")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">{course?.title ?? "Course"}</span>
-            <span className="sm:hidden">Course</span>
-          </Button>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button variant="ghost" onClick={() => setLocation(courseId ? `/courses/${courseId}` : "/")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">{course?.title ?? "Course"}</span>
+              <span className="sm:hidden">Course</span>
+            </Button>
+            <AuthNav compact />
+          </div>
         </div>
       </header>
 

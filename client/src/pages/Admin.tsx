@@ -21,13 +21,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
 import CurriculumManager from "@/components/admin/CurriculumManager";
-import { Loader2, BookOpen, ShoppingCart, Users, Plus, ArrowLeft, Trash2, Pencil } from "lucide-react";
+import { Loader2, BookOpen, ShoppingCart, Users, Plus, ArrowLeft, Trash2, Pencil, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export default function Admin() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
@@ -137,8 +137,16 @@ export default function Admin() {
             <Button variant="ghost" onClick={() => setLocation("/my-courses")}>
               My Courses
             </Button>
-            <Button variant="outline">
-              {user?.name || user?.email}
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await logout();
+                setLocation("/");
+              }}
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
           </nav>
         </div>

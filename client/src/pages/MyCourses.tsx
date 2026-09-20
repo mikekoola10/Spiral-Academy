@@ -3,13 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, BookOpen, ArrowLeft, GraduationCap, Calendar } from "lucide-react";
+import { Loader2, BookOpen, ArrowLeft, GraduationCap, Calendar, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useEffect } from "react";
 
 export default function MyCourses() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { data: enrollments, isLoading } = trpc.enrollments.myEnrollments.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -50,8 +50,16 @@ export default function MyCourses() {
                 Admin
               </Button>
             )}
-            <Button variant="outline" onClick={() => trpc.auth.logout.useMutation()}>
-              {user?.name || user?.email}
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await logout();
+                setLocation("/");
+              }}
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
           </nav>
         </div>
