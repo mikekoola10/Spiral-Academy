@@ -9,8 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
-import { Loader2, BookOpen, ShoppingCart, Users, Plus, ArrowLeft } from "lucide-react";
+import { Loader2, BookOpen, ShoppingCart, Users, Plus, ArrowLeft, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -39,6 +49,19 @@ export default function Admin() {
     },
     onError: (error) => {
       toast.error(error.message);
+    },
+  });
+
+  const [courseToDelete, setCourseToDelete] = useState<{ id: number; title: string } | null>(null);
+  const deleteCourse = trpc.courses.delete.useMutation({
+    onSuccess: () => {
+      toast.success('Course deleted');
+      setCourseToDelete(null);
+      utils.courses.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      setCourseToDelete(null);
     },
   });
 
@@ -374,6 +397,7 @@ export default function Admin() {
                         <TableHead>Level</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -393,11 +417,21 @@ export default function Admin() {
                                 {course.isActive ? 'Active' : 'Inactive'}
                               </Badge>
                             </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Delete ${course.title}`}
+                                onClick={() => setCourseToDelete({ id: course.id, title: course.title })}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
                             No courses yet
                           </TableCell>
                         </TableRow>
@@ -410,6 +444,28 @@ export default function Admin() {
           </Tabs>
         </div>
       </section>
+
+      <AlertDialog open={courseToDelete !== null} onOpenChange={(open) => { if (!open) setCourseToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete course?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{courseToDelete?.title}" along with its orders,
+              enrollments, and payment logs. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteCourse.isPending}
+              onClick={() => courseToDelete && deleteCourse.mutate({ id: courseToDelete.id })}
+            >
+              {deleteCourse.isPending ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

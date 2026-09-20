@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { neon } from "@neondatabase/serverless";
@@ -134,6 +134,29 @@ export async function createCourse(course: InsertCourse): Promise<Course> {
   if (!newCourse) throw new Error("Failed to retrieve created course");
 
   return newCourse;
+}
+
+/**
+ * Delete a course and all records tied to it (payment logs, enrollments,
+ * orders). Admin-only; used to remove test or retired courses.
+ */
+export async function deleteCourse(courseId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
+  if (existing.length === 0) throw new Error("Course not found");
+
+  const courseOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.courseId, courseId));
+  const orderIds = courseOrders.map(o => o.id);
+
+  // Delete in dependency order: payment logs -> enrollments -> orders -> course
+  if (orderIds.length > 0) {
+    await db.delete(paymentLogs).where(inArray(paymentLogs.orderId, orderIds));
+  }
+  await db.delete(enrollments).where(eq(enrollments.courseId, courseId));
+  await db.delete(orders).where(eq(orders.courseId, courseId));
+  await db.delete(courses).where(eq(courses.id, courseId));
 }
 
 // ==================== Order Helpers ====================

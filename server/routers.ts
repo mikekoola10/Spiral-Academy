@@ -153,6 +153,20 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return await db.createCourse(input);
       }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        try {
+          await db.deleteCourse(input.id);
+        } catch (err) {
+          if (err instanceof Error && err.message === "Course not found") {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
+          }
+          throw err;
+        }
+        return { success: true };
+      }),
   }),
 
   payments: router({
