@@ -53,6 +53,14 @@ export default function Admin() {
     enabled: isAuthenticated && user?.role === 'admin',
   });
 
+  const { data: leads } = trpc.receptionist.listLeads.useQuery(undefined, {
+    enabled: isAuthenticated && user?.role === 'admin',
+  });
+
+  const { data: bookings } = trpc.receptionist.listBookingRequests.useQuery(undefined, {
+    enabled: isAuthenticated && user?.role === 'admin',
+  });
+
   const [newPromoCode, setNewPromoCode] = useState("");
   const [newPromoPercent, setNewPromoPercent] = useState("30");
   const createPromo = trpc.promos.create.useMutation({
@@ -85,6 +93,15 @@ export default function Admin() {
   };
 
   const utils = trpc.useUtils();
+  const markHandled = trpc.receptionist.markBookingHandled.useMutation({
+    onSuccess: () => {
+      toast.success('Booking marked as handled');
+      utils.receptionist.listBookingRequests.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
   const createCourse = trpc.courses.create.useMutation({
     onSuccess: () => {
       toast.success('Course created successfully');
@@ -267,6 +284,7 @@ export default function Admin() {
               <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
               <TabsTrigger value="promos">Promo Codes</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              <TabsTrigger value="receptionist">Receptionist</TabsTrigger>
             </TabsList>
 
             <TabsContent value="orders" className="space-y-4">
@@ -756,6 +774,113 @@ export default function Admin() {
                         <TableRow>
                           <TableCell colSpan={2} className="text-center text-muted-foreground">
                             No page views recorded yet.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="receptionist" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Leads</CardTitle>
+                  <CardDescription>
+                    Visitors who asked the assistant to contact them. {leads?.length ?? 0} total.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Interest</TableHead>
+                        <TableHead>Message</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {leads && leads.length > 0 ? (
+                        leads.map((l) => (
+                          <TableRow key={l.id}>
+                            <TableCell className="font-medium">{l.name}</TableCell>
+                            <TableCell>{l.email}</TableCell>
+                            <TableCell>{l.interest ?? '—'}</TableCell>
+                            <TableCell className="max-w-[240px] truncate" title={l.message ?? ''}>{l.message ?? '—'}</TableCell>
+                            <TableCell>{l.sourcePage ?? '—'}</TableCell>
+                            <TableCell>{new Date(l.createdAt).toLocaleDateString()}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            No leads yet — the assistant captures them from the chat widget.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Booking Requests</CardTitle>
+                  <CardDescription>
+                    Visitors who asked to book a call. {bookings?.length ?? 0} total.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Day</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Topic</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bookings && bookings.length > 0 ? (
+                        bookings.map((b) => (
+                          <TableRow key={b.id}>
+                            <TableCell className="font-medium">{b.name}</TableCell>
+                            <TableCell>{b.email}</TableCell>
+                            <TableCell>{b.preferredDay}</TableCell>
+                            <TableCell>{b.preferredTime}</TableCell>
+                            <TableCell className="max-w-[200px] truncate" title={b.topic ?? ''}>{b.topic ?? '—'}</TableCell>
+                            <TableCell>
+                              <Badge variant={b.status === 'handled' ? 'secondary' : 'default'}>
+                                {b.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{new Date(b.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              {b.status !== 'handled' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={markHandled.isPending}
+                                  onClick={() => markHandled.mutate({ id: b.id })}
+                                >
+                                  Mark handled
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground">
+                            No booking requests yet.
                           </TableCell>
                         </TableRow>
                       )}

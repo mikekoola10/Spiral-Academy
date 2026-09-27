@@ -3,7 +3,7 @@ import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { neon } from "@neondatabase/serverless";
 import { Pool } from "pg";
-import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog, modules, Module, InsertModule, lessons, Lesson, InsertLesson, lessonProgress, InsertLessonProgress, emailSubscribers, promoCodes, InsertPromoCode, pageViews } from "../drizzle/schema";
+import { InsertUser, users, courses, Course, InsertCourse, orders, Order, InsertOrder, enrollments, Enrollment, InsertEnrollment, paymentLogs, InsertPaymentLog, modules, Module, InsertModule, lessons, Lesson, InsertLesson, lessonProgress, InsertLessonProgress, emailSubscribers, promoCodes, InsertPromoCode, pageViews, receptionistLeads, InsertReceptionistLead, receptionistBookingRequests, InsertReceptionistBookingRequest } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 type Db = ReturnType<typeof drizzleNeon> | ReturnType<typeof drizzleNodePg>;
@@ -575,6 +575,58 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
     byDay: byDayRows,
     topPages: topPageRows,
   };
+}
+
+// ==================== AI Receptionist ====================
+
+export async function createReceptionistLead(lead: InsertReceptionistLead) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [created] = await db.insert(receptionistLeads).values(lead).returning();
+  if (!created) throw new Error("Failed to save lead");
+  return created;
+}
+
+export async function getReceptionistLeads() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(receptionistLeads)
+    .orderBy(desc(receptionistLeads.createdAt))
+    .limit(100);
+}
+
+export async function createBookingRequest(request: InsertReceptionistBookingRequest) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [created] = await db.insert(receptionistBookingRequests).values(request).returning();
+  if (!created) throw new Error("Failed to save booking request");
+  return created;
+}
+
+export async function getBookingRequests() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(receptionistBookingRequests)
+    .orderBy(desc(receptionistBookingRequests.createdAt))
+    .limit(100);
+}
+
+export async function markBookingRequestHandled(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(receptionistBookingRequests)
+    .set({ status: "handled" })
+    .where(eq(receptionistBookingRequests.id, id));
 }
 
 // ==================== Payment Log Helpers ====================

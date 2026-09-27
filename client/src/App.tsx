@@ -14,6 +14,7 @@ import MyCourses from "./pages/MyCourses";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
+import ReceptionistWidget from "./components/ReceptionistWidget";
 
 /** Fire-and-forget page view beacon on every route change. Cookieless. */
 function PageViewTracker() {
@@ -57,6 +58,7 @@ function App() {
           <Toaster />
           <PageViewTracker />
           <Router />
+          <ReceptionistWidget />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

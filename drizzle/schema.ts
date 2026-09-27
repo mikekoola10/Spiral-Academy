@@ -230,3 +230,37 @@ export const lessonProgress = pgTable("lessonProgress", {
 
 export type LessonProgress = typeof lessonProgress.$inferSelect;
 export type InsertLessonProgress = typeof lessonProgress.$inferInsert;
+
+/**
+ * AI receptionist leads - visitors who asked the assistant to contact them.
+ */
+export const receptionistLeads = pgTable("receptionistLeads", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  interest: text("interest"),
+  message: text("message"),
+  sourcePage: text("sourcePage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ReceptionistLead = typeof receptionistLeads.$inferSelect;
+export type InsertReceptionistLead = typeof receptionistLeads.$inferInsert;
+
+/**
+ * AI receptionist booking requests - visitors who asked to book a call.
+ * Status is 'new' until an admin marks it 'handled'.
+ */
+export const receptionistBookingRequests = pgTable("receptionistBookingRequests", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  preferredDay: text("preferredDay").notNull(),
+  preferredTime: text("preferredTime").notNull(),
+  topic: text("topic"),
+  status: text("status").default("new").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ReceptionistBookingRequest = typeof receptionistBookingRequests.$inferSelect;
+export type InsertReceptionistBookingRequest = typeof receptionistBookingRequests.$inferInsert;
