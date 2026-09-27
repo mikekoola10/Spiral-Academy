@@ -1,6 +1,6 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, createHash, type BinaryLike, type ScryptOptions } from "crypto";
 import { promisify } from "util";
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq, gt, isNull, lt } from "drizzle-orm";
 import { sessions, users, type User } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { ENV } from "./env";
@@ -120,6 +120,73 @@ export async function purgeExpiredSessions(): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
+}
+
+/** Delete every session for a user (used after a password reset). */
+export async function destroyUserSessions(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(sessions).where(eq(sessions.userId, userId));
+}
+
+// ---- password resets (single-use, hashed tokens, 1h expiry) ----
+
+import { passwordResets } from "../../drizzle/schema";
+
+export const PASSWORD_RESET_TTL_MS = 1000 * 60 * 60; // 1 hour
+
+/** Create a reset token for a user, returning the raw token to email. */
+export async function createPasswordReset(userId: number): Promise<string> {
+  const db = await requireDb();
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+  await db.insert(passwordResets).values({
+    tokenHash: hashToken(token),
+    userId,
+    expiresAt,
+  });
+  return token;
+}
+
+/**
+ * Validate a raw reset token and mark it used.
+ * Returns the userId, or null when the token is unknown, expired, or used.
+ */
+export async function consumePasswordReset(token: string): Promise<number | null> {
+  if (!token || typeof token !== "string" || !/^[0-9a-f]{64}$/.test(token)) return null;
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(passwordResets)
+    .where(
+      and(
+        eq(passwordResets.tokenHash, hashToken(token)),
+        gt(passwordResets.expiresAt, new Date())
+      )
+    )
+    .limit(1);
+  if (rows.length === 0) return null;
+  const record = rows[0];
+  // Atomic single-use claim: the UPDATE only matches while usedAt is still
+  // NULL, so two concurrent requests can't both consume the same token.
+  const claimed = await db
+    .update(passwordResets)
+    .set({ usedAt: new Date() })
+    .where(and(eq(passwordResets.id, record.id), isNull(passwordResets.usedAt)))
+    .returning();
+  if (claimed.length === 0) return null;
+  return record.userId;
+}
+
+/** Set a new password for a user (used by the reset flow). */
+export async function setUserPassword(userId: number, password: string): Promise<void> {
+  const db = await requireDb();
+  const passwordHash = await hashPassword(password);
+  await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, userId));
 }
 
 // ---- user helpers ----

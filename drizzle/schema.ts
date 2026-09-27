@@ -49,6 +49,23 @@ export const sessions = pgTable("sessions", {
 });
 
 export type Session = typeof sessions.$inferSelect;
+
+/**
+ * Single-use password-reset tokens. Only the SHA-256 hash of the raw token
+ * is stored; the raw token is emailed to the user and never persisted.
+ */
+export const passwordResets = pgTable("passwordResets", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PasswordReset = typeof passwordResets.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
 
 /**

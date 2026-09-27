@@ -13,6 +13,8 @@ import Checkout from "./pages/Checkout";
 import MyCourses from "./pages/MyCourses";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Admin from "./pages/Admin";
 import ReceptionistWidget from "./components/ReceptionistWidget";
 
@@ -39,6 +41,8 @@ function Router() {
       <Route path={"/courses/:id"} component={CourseDetail} />
       <Route path={"/courses/:id/lessons/:lessonId"} component={LessonView} />
       <Route path={"/login"} component={Login} />
+      <Route path={"/forgot-password"} component={ForgotPassword} />
+      <Route path={"/reset-password/:token"} component={ResetPassword} />
       <Route path={"/checkout/bundle"} component={Checkout} />
       <Route path={"/checkout/:id"} component={Checkout} />
       <Route path={"/payment-success"} component={PaymentSuccess} />

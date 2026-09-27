@@ -2,17 +2,23 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import {
   SESSION_TTL_MS,
+  consumePasswordReset,
   createLocalUser,
+  createPasswordReset,
   createSession,
   destroySession,
+  destroyUserSessions,
   getUserByEmail,
   isRateLimited,
   normalizeEmail,
+  setUserPassword,
   syncAdminRole,
   touchLastSignedIn,
   verifyPassword,
 } from "./_core/localAuth";
+import { sendPasswordResetEmail } from "./_core/email";
 import { invokeLLM } from "./_core/llm";
+import { ENV } from "./_core/env";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
@@ -243,6 +249,57 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+
+    // Always returns { ok: true } so attackers can't probe registered emails.
+    requestPasswordReset: publicProcedure
+      .input(
+        z.object({
+          email: z.string().trim().min(3).max(320).email("Enter a valid email address"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const ip = ctx.req.ip ?? "unknown";
+        const email = normalizeEmail(input.email);
+        if (isRateLimited(`pwreset:${ip}:${email}`, 5, 60 * 60 * 1000)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many reset attempts. Try again later." });
+        }
+
+        const user = await getUserByEmail(email);
+        // Only local (password) accounts can reset via email.
+        if (user?.passwordHash) {
+          const token = await createPasswordReset(user.id);
+          const baseUrl =
+            ENV.appUrl ||
+            `${ctx.req.protocol}://${ctx.req.get("host")}`;
+          const resetUrl = `${baseUrl.replace(/\/$/, "")}/reset-password/${token}`;
+          // Best-effort: send failures stay server-side, response is always ok.
+          await sendPasswordResetEmail(email, resetUrl);
+        }
+        return { ok: true } as const;
+      }),
+
+    resetPassword: publicProcedure
+      .input(
+        z.object({
+          token: z.string().trim().length(64),
+          password: z.string().min(8, "Password must be at least 8 characters").max(128),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const ip = ctx.req.ip ?? "unknown";
+        if (isRateLimited(`pwreset-use:${ip}`, 10, 60 * 60 * 1000)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many attempts. Try again later." });
+        }
+
+        const userId = await consumePasswordReset(input.token);
+        if (!userId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This reset link is invalid or has expired." });
+        }
+        await setUserPassword(userId, input.password);
+        // Log out every other session so a compromised password can't linger.
+        await destroyUserSessions(userId);
+        return { ok: true } as const;
+      }),
   }),
 
   courses: router({
