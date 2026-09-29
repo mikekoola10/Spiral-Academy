@@ -629,6 +629,20 @@ export async function markBookingRequestHandled(id: number): Promise<void> {
     .where(eq(receptionistBookingRequests.id, id));
 }
 
+export async function deleteReceptionistLead(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(receptionistLeads).where(eq(receptionistLeads.id, id));
+}
+
+export async function deleteBookingRequest(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(receptionistBookingRequests).where(eq(receptionistBookingRequests.id, id));
+}
+
 // ==================== Payment Log Helpers ====================
 
 export async function createPaymentLog(log: InsertPaymentLog): Promise<void> {

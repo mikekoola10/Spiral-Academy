@@ -903,6 +903,20 @@ export const appRouter = router({
         await db.markBookingRequestHandled(input.id);
         return { success: true } as const;
       }),
+
+    deleteLead: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteReceptionistLead(input.id);
+        return { success: true } as const;
+      }),
+
+    deleteBookingRequest: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteBookingRequest(input.id);
+        return { success: true } as const;
+      }),
   }),
 
   orders: router({

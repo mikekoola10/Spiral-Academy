@@ -102,6 +102,31 @@ export default function Admin() {
       toast.error(error.message);
     },
   });
+  const [receptionistToDelete, setReceptionistToDelete] = useState<{
+    kind: 'lead' | 'booking'; id: number; name: string;
+  } | null>(null);
+  const deleteLead = trpc.receptionist.deleteLead.useMutation({
+    onSuccess: () => {
+      toast.success('Lead deleted');
+      setReceptionistToDelete(null);
+      utils.receptionist.listLeads.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      setReceptionistToDelete(null);
+    },
+  });
+  const deleteBooking = trpc.receptionist.deleteBookingRequest.useMutation({
+    onSuccess: () => {
+      toast.success('Booking request deleted');
+      setReceptionistToDelete(null);
+      utils.receptionist.listBookingRequests.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      setReceptionistToDelete(null);
+    },
+  });
   const createCourse = trpc.courses.create.useMutation({
     onSuccess: () => {
       toast.success('Course created successfully');
@@ -801,6 +826,7 @@ export default function Admin() {
                         <TableHead>Message</TableHead>
                         <TableHead>Source</TableHead>
                         <TableHead>Date</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -813,11 +839,21 @@ export default function Admin() {
                             <TableCell className="max-w-[240px] truncate" title={l.message ?? ''}>{l.message ?? '—'}</TableCell>
                             <TableCell>{l.sourcePage ?? '—'}</TableCell>
                             <TableCell>{new Date(l.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Delete lead ${l.name}`}
+                                onClick={() => setReceptionistToDelete({ kind: 'lead', id: l.id, name: l.name })}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
                             No leads yet — the assistant captures them from the chat widget.
                           </TableCell>
                         </TableRow>
@@ -874,6 +910,14 @@ export default function Admin() {
                                   Mark handled
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Delete booking request from ${b.name}`}
+                                onClick={() => setReceptionistToDelete({ kind: 'booking', id: b.id, name: b.name })}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
@@ -910,6 +954,37 @@ export default function Admin() {
               onClick={() => courseToDelete && deleteCourse.mutate({ id: courseToDelete.id })}
             >
               {deleteCourse.isPending ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={receptionistToDelete !== null} onOpenChange={(open) => { if (!open) setReceptionistToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {receptionistToDelete?.kind === 'lead' ? 'lead' : 'booking request'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the {receptionistToDelete?.kind === 'lead' ? 'lead' : 'booking request'} from
+              "{receptionistToDelete?.name}". This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteLead.isPending || deleteBooking.isPending}
+              onClick={() => {
+                if (!receptionistToDelete) return;
+                if (receptionistToDelete.kind === 'lead') {
+                  deleteLead.mutate({ id: receptionistToDelete.id });
+                } else {
+                  deleteBooking.mutate({ id: receptionistToDelete.id });
+                }
+              }}
+            >
+              {(deleteLead.isPending || deleteBooking.isPending) ? 'Deleting…' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
