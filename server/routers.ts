@@ -133,6 +133,10 @@ function buildReceptionistFacts(courses: Course[]): ReceptionistFacts {
 function receptionistFallback(text: string, facts: ReceptionistFacts): string {
   const t = text.toLowerCase();
   const has = (...words: string[]) => words.some((w) => t.includes(w));
+  // Whole-word match for short greetings: "hey" must not fire inside "they",
+  // "hi" must not fire inside "this"/"which".
+  const hasWord = (...words: string[]) =>
+    words.some((w) => new RegExp(`\\b${w}\\b`).test(t));
 
   if (has("human", "real person", "someone", "team", "contact", "support")) {
     return "Of course — tap \"Talk to a human\" below, leave your name and email, and our team will reach out personally.";
@@ -140,11 +144,15 @@ function receptionistFallback(text: string, facts: ReceptionistFacts): string {
   if (has("book", "call", "appointment", "schedule", "talk")) {
     return "I can set that up — tap \"Book a call\" and tell me your name, email, and when works for you. We'll confirm by email.";
   }
-  if (has("promo", "discount", "coupon", "launch30", "deal", "offer", "sale")) {
-    return "Use promo code LAUNCH30 at checkout for 30% off — that brings the Complete Bundle down to $349.30. Just enter it on the checkout page.";
-  }
+  // Bundle is checked before promo: "tell me about the bundle deal" is a
+  // bundle question, not a discount question.
   if (has("bundle", "all courses", "everything", "package")) {
     return `The Complete Bundle gets you all ${facts.courseCount} courses for $${BUNDLE_PRICE_USD} (a ${facts.bundleValue} value). With LAUNCH30 it's 30% off. It's the best deal if you want the full path.`;
+  }
+  // Note: "offer" is intentionally NOT a promo keyword — "what courses do
+  // you offer?" is a course question, not a discount question.
+  if (has("promo", "discount", "coupon", "launch30", "deal", "sale")) {
+    return "Use promo code LAUNCH30 at checkout for 30% off — that brings the Complete Bundle down to $349.30. Just enter it on the checkout page.";
   }
   if (has("price", "cost", "much", "expensive", "cheap", "pricing")) {
     return `Here's the lineup: ${facts.courseList}. Or grab everything in the Complete Bundle for $${BUNDLE_PRICE_USD}.`;
@@ -158,7 +166,7 @@ function receptionistFallback(text: string, facts: ReceptionistFacts): string {
   if (has("what is", "about", "spiral", "how does", "how it works", "how do")) {
     return "Spiral Academy is a self-paced online school for practical AI skills — from AI fundamentals to building AI agents. Pick a course, check out, and start learning right away.";
   }
-  if (has("hello", "hey")) {
+  if (hasWord("hello", "hey", "hi")) {
     return "Hi there! I can help you browse courses, explain the bundle deal, or book a call. What are you looking for?";
   }
   return "I can help with courses, the bundle deal, discounts, or booking a call. Which sounds useful? You can also tap \"Talk to a human\" and we'll reach out by email.";
