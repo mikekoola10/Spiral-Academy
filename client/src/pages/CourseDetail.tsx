@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   ArrowLeft,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { useRoute, useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
@@ -176,6 +177,13 @@ export default function CourseDetail() {
               </Button>
             </div>
           </div>
+          {!isEnrolled && (
+            <p className="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              Yours forever — no subscription, no expiry. Covered by the 30-day
+              promise: finish the course, and if it wasn&rsquo;t worth it, full refund.
+            </p>
+          )}
         </div>
       </section>
 

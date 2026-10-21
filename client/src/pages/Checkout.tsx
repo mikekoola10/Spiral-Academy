@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc";
-import { Loader2, CreditCard, Coins, ArrowLeft, CheckCircle2, XCircle, Tag, Package } from "lucide-react";
+import { Loader2, CreditCard, Coins, ArrowLeft, CheckCircle2, XCircle, Tag, Package, ShieldCheck } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
 import { getLoginUrl } from "@/const";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -306,6 +306,15 @@ export default function Checkout() {
               <div className="flex justify-between items-center text-lg font-semibold">
                 <span>Total</span>
                 <span className="text-2xl">{money(total)}</span>
+              </div>
+              <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
+                <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <p>
+                  <span className="font-medium">The 30-day promise:</span> finish the
+                  course — if it wasn&rsquo;t worth it, email us within 30 days of
+                  buying for a full refund. And it&rsquo;s yours forever: no
+                  subscription, no expiry.
+                </p>
               </div>
             </CardContent>
           </Card>

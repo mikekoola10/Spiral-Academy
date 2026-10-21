@@ -7,7 +7,6 @@ import {
   Loader2,
   BookOpen,
   Clock,
-  TrendingUp,
   Sparkles,
   ArrowRight,
   ShieldCheck,
@@ -15,6 +14,9 @@ import {
   LogOut,
   Package,
   BadgePercent,
+  Infinity as InfinityIcon,
+  Calculator,
+  Hammer,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
@@ -149,6 +151,9 @@ export default function Courses() {
               </Button>
             )}
           </div>
+          <p className="mt-6 text-sm text-muted-foreground">
+            Buy once — yours forever. Every purchase is covered by our 30-day promise.
+          </p>
         </div>
       </section>
 
@@ -180,7 +185,8 @@ export default function Courses() {
                     <span className="line-through">${bundle.totalValue.toFixed(2)} value</span>{" "}
                     — for <span className="font-semibold text-foreground">${bundle.price.toFixed(2)}</span>.
                     Use code <span className="font-mono font-semibold text-violet-700 dark:text-violet-300">LAUNCH30</span> at
-                    checkout for an extra 30% off.
+                    checkout for an extra 30% off. One payment — yours forever, no
+                    subscription, no expiry — and covered by the 30-day promise.
                     {bundleOwnedCount > 0 && (
                       <> You already own {bundleOwnedCount} of {bundle.count} — the bundle covers the rest.</>
                     )}
@@ -202,22 +208,27 @@ export default function Courses() {
 
       {/* Value props */}
       <section className="border-y bg-muted/40">
-        <div className="container grid grid-cols-1 sm:grid-cols-3 gap-6 py-10">
+        <div className="container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 py-10">
           {[
             {
-              icon: Clock,
-              title: "Learn at your own pace",
-              text: "Self-paced courses that fit around your schedule.",
+              icon: InfinityIcon,
+              title: "Buy once. It never expires.",
+              text: "One payment, permanent access. No subscription, no 180-day clock, no paying twice for the same course.",
+            },
+            {
+              icon: Calculator,
+              title: "Just honest math",
+              text: "The bundle is the courses added up, then cut. No inflated \u201cvalue\u201d anchors, no discounts on discounts.",
+            },
+            {
+              icon: Hammer,
+              title: "Made to be used",
+              text: "Hands-on courses built around real tools and real workflows \u2014 you build as you learn, not just watch.",
             },
             {
               icon: ShieldCheck,
-              title: "Secure checkout",
-              text: "Payments processed securely through Stripe.",
-            },
-            {
-              icon: TrendingUp,
-              title: "Track your progress",
-              text: "Your enrollments are always waiting in My Courses.",
+              title: "The 30-day promise",
+              text: "Finish the course. If it wasn\u2019t worth it, email us within 30 days of buying \u2014 full refund.",
             },
           ].map(({ icon: Icon, title, text }) => (
             <div key={title} className="flex items-start gap-4">
