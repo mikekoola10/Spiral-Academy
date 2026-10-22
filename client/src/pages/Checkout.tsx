@@ -311,7 +311,11 @@ export default function Checkout() {
                 <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <p>
                   <span className="font-medium">The 30-day promise:</span> finish the
-                  course — if it wasn&rsquo;t worth it, email us within 30 days of
+                  course — if it wasn&rsquo;t worth it, email us at{" "}
+                  <a href="mailto:spiralcontrolhq@gmail.com" className="underline underline-offset-4">
+                    spiralcontrolhq@gmail.com
+                  </a>{" "}
+                  within 30 days of
                   buying for a full refund. And it&rsquo;s yours forever: no
                   subscription, no expiry.
                 </p>

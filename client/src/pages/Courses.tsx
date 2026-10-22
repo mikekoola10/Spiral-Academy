@@ -228,7 +228,7 @@ export default function Courses() {
             {
               icon: ShieldCheck,
               title: "The 30-day promise",
-              text: "Finish the course. If it wasn\u2019t worth it, email us within 30 days of buying \u2014 full refund.",
+              text: "Finish the course. If it wasn\u2019t worth it, email spiralcontrolhq@gmail.com within 30 days of buying \u2014 full refund.",
             },
           ].map(({ icon: Icon, title, text }) => (
             <div key={title} className="flex items-start gap-4">
@@ -342,6 +342,15 @@ export default function Courses() {
             </span>
             <span className="font-semibold font-display">Spiral.AI Academy</span>
           </div>
+          <p className="text-sm text-muted-foreground">
+            Support:{" "}
+            <a
+              href="mailto:spiralcontrolhq@gmail.com"
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              spiralcontrolhq@gmail.com
+            </a>
+          </p>
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Spiral.AI Academy. All rights reserved.
           </p>
