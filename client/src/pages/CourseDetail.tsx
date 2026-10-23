@@ -16,9 +16,11 @@ import {
   ArrowLeft,
   Sparkles,
   ShieldCheck,
+  Hammer,
 } from "lucide-react";
 import { useRoute, useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
+import { getCourseArtifact } from "@/lib/courseArtifacts";
 import AuthNav from "@/components/AuthNav";
 
 function levelColor(level: string) {
@@ -82,6 +84,7 @@ export default function CourseDetail() {
   const pct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
   const nextLesson = allLessons.find((l) => !completedIds.has(l.id)) ?? allLessons[0];
   const isEnrolled = Boolean(enrollment) || user?.role === "admin";
+  const artifact = getCourseArtifact(course.id);
 
   const handleCta = () => {
     if (!isAuthenticated) {
@@ -149,6 +152,20 @@ export default function CourseDetail() {
             {course.title}
           </h1>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl">{course.description}</p>
+
+          {artifact && (
+            <div className="mb-8 flex items-start gap-3 rounded-xl border border-violet-500/25 bg-violet-600/5 p-4 max-w-2xl">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-600/10 text-violet-700 dark:text-violet-400">
+                <Hammer className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold">
+                  What you&rsquo;ll leave with: {artifact.name}
+                </p>
+                <p className="text-sm text-muted-foreground">{artifact.detail}</p>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-4">
             {isEnrolled && totalLessons > 0 && (

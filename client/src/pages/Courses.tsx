@@ -223,7 +223,7 @@ export default function Courses() {
             {
               icon: Hammer,
               title: "Made to be used",
-              text: "Hands-on courses built around real tools and real workflows \u2014 you build as you learn, not just watch.",
+              text: "Every course ends with a finished thing in your hands \u2014 an app, an agent, a fine-tuned model, a workflow you documented. You build as you learn, not just watch, and every course page names exactly what you'll leave with.",
             },
             {
               icon: ShieldCheck,
