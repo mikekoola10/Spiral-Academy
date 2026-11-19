@@ -330,38 +330,49 @@ export default function Checkout() {
               <CardDescription>Choose how you'd like to pay</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Promo code */}
-              <div className="space-y-2">
-                <Label htmlFor="promo">Promo code</Label>
-                {appliedPromo ? (
-                  <div className="flex items-center justify-between rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                    <span className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                      <Tag className="h-4 w-4" />
-                      {appliedPromo.code} — {appliedPromo.percentOff}% off
-                    </span>
-                    <Button variant="ghost" size="sm" onClick={handleRemovePromo}>
-                      Remove
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      id="promo"
-                      placeholder="Enter code (try LAUNCH30)"
-                      value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleApplyPromo(); } }}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={handleApplyPromo}
-                      disabled={!promoInput.trim() || validatePromo.isFetching}
-                    >
-                      {validatePromo.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
-                    </Button>
-                  </div>
-                )}
-              </div>
+              {/* Promo code — skipped during Black Friday: $20 IS the deal */}
+              {isBundle && bundle?.isBlackFriday ? (
+                <div className="flex items-start gap-2 rounded-md border border-violet-500/30 bg-violet-500/10 p-3 text-sm">
+                  <Tag className="h-4 w-4 mt-0.5 shrink-0 text-violet-700 dark:text-violet-300" />
+                  <p>
+                    <span className="font-medium">Black Friday price applied:</span> $20
+                    for all {bundle.count} courses — no code needed. Deal ends
+                    Cyber Monday, Nov 30.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="promo">Promo code</Label>
+                  {appliedPromo ? (
+                    <div className="flex items-center justify-between rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                      <span className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                        <Tag className="h-4 w-4" />
+                        {appliedPromo.code} — {appliedPromo.percentOff}% off
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={handleRemovePromo}>
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        id="promo"
+                        placeholder="Enter code (try LAUNCH30)"
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleApplyPromo(); } }}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={handleApplyPromo}
+                        disabled={!promoInput.trim() || validatePromo.isFetching}
+                      >
+                        {validatePromo.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <Separator />
 
