@@ -119,7 +119,7 @@ export default function Courses() {
             className="mb-6 gap-1.5 border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300 px-3 py-1"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            {bundle?.isBlackFriday ? "Black Friday — full bundle $20 through Nov 30" : "Practical AI education"}
+            {bundle?.isIntroPrice ? "First round — full bundle $20 (was $499)" : "Practical AI education"}
           </Badge>
           <h1 className="font-display text-5xl md:text-6xl font-bold tracking-tight mb-6">
             Master{" "}
@@ -171,10 +171,10 @@ export default function Courses() {
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <Badge className="bg-violet-600 hover:bg-violet-600 text-white border-0">
                       <BadgePercent className="h-3.5 w-3.5 mr-1" />
-                      {bundle.isBlackFriday ? `Black Friday — Save ${bundleSavePct}%` : `Save ${bundleSavePct}%`}
+                      {bundle.isIntroPrice ? `First round — Save ${bundleSavePct}%` : `Save ${bundleSavePct}%`}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
-                      {bundle.isBlackFriday ? "Ends Cyber Monday, Nov 30" : "Limited launch pricing"}
+                      {bundle.isIntroPrice ? "Was $499 — first-round price" : "Limited launch pricing"}
                     </span>
                   </div>
                   <h2 className="font-display text-2xl md:text-3xl font-bold tracking-tight mb-2">
@@ -184,8 +184,8 @@ export default function Courses() {
                     All {bundle.count} courses —{" "}
                     <span className="line-through">${bundle.totalValue.toFixed(2)} value</span>{" "}
                     — for <span className="font-semibold text-foreground">${bundle.price.toFixed(2)}</span>.
-                    {bundle.isBlackFriday ? (
-                      <> Black Friday price already applied — no code needed. </>
+                    {bundle.isIntroPrice ? (
+                      <> First-round price already applied — no code needed. </>
                     ) : (
                       <> Use code <span className="font-mono font-semibold text-violet-700 dark:text-violet-300">LAUNCH30</span> at
                       checkout for an extra 30% off. </>

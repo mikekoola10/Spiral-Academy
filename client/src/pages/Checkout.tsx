@@ -330,14 +330,13 @@ export default function Checkout() {
               <CardDescription>Choose how you'd like to pay</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Promo code — skipped during Black Friday: $20 IS the deal */}
-              {isBundle && bundle?.isBlackFriday ? (
+              {/* Promo code — skipped at first-round price: $20 IS the deal */}
+              {isBundle && bundle?.isIntroPrice ? (
                 <div className="flex items-start gap-2 rounded-md border border-violet-500/30 bg-violet-500/10 p-3 text-sm">
                   <Tag className="h-4 w-4 mt-0.5 shrink-0 text-violet-700 dark:text-violet-300" />
                   <p>
-                    <span className="font-medium">Black Friday price applied:</span> $20
-                    for all {bundle.count} courses — no code needed. Deal ends
-                    Cyber Monday, Nov 30.
+                    <span className="font-medium">First-round price applied:</span> $20
+                    for all {bundle.count} courses — no code needed. Was $499.
                   </p>
                 </div>
               ) : (
