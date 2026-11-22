@@ -174,7 +174,7 @@ export default function Courses() {
                       {bundle.isBlackFriday ? `Black Friday — Save ${bundleSavePct}%` : bundle.isIntroPrice ? `First round — Save ${bundleSavePct}%` : `Save ${bundleSavePct}%`}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
-                      {bundle.isBlackFriday ? "Ends Cyber Monday, Nov 30" : bundle.isIntroPrice ? "Was $499 — first-round price" : "Limited launch pricing"}
+                      {bundle.isBlackFriday ? "Was $499 — ends Cyber Monday, Nov 30" : bundle.isIntroPrice ? "Was $499 — first-round price" : "Limited launch pricing"}
                     </span>
                   </div>
                   <h2 className="font-display text-2xl md:text-3xl font-bold tracking-tight mb-2">
